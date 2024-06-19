@@ -1,3 +1,7 @@
 v
 data/*
 !data/.gitignore
+cruft/*
+!cruft/.gitignore
+
+**/__pycache__
