@@ -68,14 +68,14 @@ random.seed(seed)
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(seed)
 
-BATCH_SIZE = 16
+BATCH_SIZE = 256
 hidden_size = 768
 learning_rate = 1e-5
-epochs=100
+epochs=5
 freeze = True
-data_mode='one-batch'
-model_name = 'big-head'
-skip_wandb = True
+data_mode='full'
+model_name = 'random'
+skip_wandb = False
 
 metrics = MetricsLogger(skip_wandb=skip_wandb)
 

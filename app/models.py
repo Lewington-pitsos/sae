@@ -47,6 +47,7 @@ class SimpleGPT2SequenceClassifier(nn.Module):
 class RandomClassifier(torch.nn.Module):
     def __init__(self):
         super(RandomClassifier, self).__init__()
+        self.fc1 = nn.Linear(2, 2)
 
     def forward(self, input_ids, attention_mask):
         batch_size = input_ids.shape[0]
@@ -54,8 +55,12 @@ class RandomClassifier(torch.nn.Module):
 
         one_hot_tensor = torch.zeros(batch_size, 2)
         one_hot_tensor[torch.arange(batch_size), random_predictions[0]] = 1
-    
-        return one_hot_tensor
+
+        x = self.fc1(one_hot_tensor)
+
+
+
+        return x
 
 class BigHeadGPT2SequenceClassifier(nn.Module):
     def __init__(self, hidden_size: int, max_seq_len: int, gpt_model_name: str, num_classes: int = 2, freeze=False):
@@ -138,5 +143,7 @@ def build_model(model_name, hidden_size, max_seq_len, gpt_model_name, freeze, de
         return BigHeadGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=max_seq_len, gpt_model_name=gpt_model_name, freeze=freeze)
     elif model_name == 'sae-classifier':
         return SAEClassifier(gpt_model_name=gpt_model_name, hook_name='blocks.8.hook_resid_pre', hook_layer=8, device=device, max_seq_len=max_seq_len)
+    elif model_name == 'random':
+        return RandomClassifier()
 
     raise ValueError(f"Invalid model name: {model_name}")
