@@ -1,11 +1,13 @@
 import torch.nn as nn
 from transformers import GPT2Model
 
-
 class SimpleGPT2SequenceClassifier(nn.Module):
-    def __init__(self, hidden_size: int, max_seq_len: int, gpt_model_name: str, num_classes: int = 2):
+    def __init__(self, hidden_size: int, max_seq_len: int, gpt_model_name: str, num_classes: int = 2, freeze=False):
         super(SimpleGPT2SequenceClassifier, self).__init__()
         self.gpt2model = GPT2Model.from_pretrained(gpt_model_name)
+        if freeze:
+            for param in self.gpt2model.parameters():
+                param.requires_grad = False
         self.fc1 = nn.Linear(hidden_size * max_seq_len, num_classes)
 
     def forward(self, input_id, mask):

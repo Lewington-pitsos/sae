@@ -5,3 +5,5 @@ cruft/*
 !cruft/.gitignore
 
 **/__pycache__
+
+wandb
