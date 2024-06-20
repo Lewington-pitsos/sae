@@ -14,9 +14,7 @@ from app.constants import *
 from app.data import build_dataset
 
 def train(model, train_dataset, test_dataset, learning_rate, epochs, batch_size):
-    
     batch1_table = wandb.Table(columns=["epoch", "idx", "input_text", "label", "prediction", "logits"])
-
 
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 
@@ -31,40 +29,41 @@ def train(model, train_dataset, test_dataset, learning_rate, epochs, batch_size)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    train_losses = []
-    test_losses = []
-
     for epoch in range(epochs):
         model.train()
-        total_loss = 0
-        for input_ids, attention_mask, labels in tqdm(train_loader):
-            input_ids, attention_mask, labels = input_ids.to(device), attention_mask.to(device), labels.to(device)
+        total_train_loss = 0
+        total_train_accuracy = 0
+        for activations, input_ids, attention_mask, labels in tqdm(train_loader):
+            activations, input_ids, attention_mask, labels = activations.to(device), input_ids.to(device), attention_mask.to(device), labels.to(device)
             
             optimizer.zero_grad()
-            outputs = model(input_ids, attention_mask)
+            outputs = model(activations, input_ids, attention_mask)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
             
-            total_loss += loss.item()
+            total_train_loss += loss.item()
+            total_train_accuracy += (torch.argmax(outputs, dim=-1) == labels).sum().item()
             wandb.log({"train_batch_loss": loss.item(), "batch_learning_rate": scheduler.get_last_lr()[0]})
         
-        avg_train_loss = total_loss / len(train_loader)
-        train_losses.append(avg_train_loss)
+        avg_train_loss = total_train_loss / len(train_loader)
+        avg_train_accuracy = total_train_accuracy / len(train_dataset)
         print(f"Epoch {epoch + 1}/{epochs}, Train Loss: {avg_train_loss}")
-        wandb.log({"train_loss": avg_train_loss})
+        wandb.log({"train_loss": avg_train_loss, "train_accuracy": avg_train_accuracy})
 
         # Evaluate on test data
         model.eval()
         total_test_loss = 0
+        test_accuracy = 0
         with torch.no_grad():
-            for batch_idx, batch in enumerate(test_loader):
-                input_ids, attention_mask, labels = batch
+            for batch_idx, (activations, input_ids, attention_mask, labels) in enumerate(test_loader):
 
-                input_ids, attention_mask, labels = input_ids.to(device), attention_mask.to(device), labels.to(device)
-                outputs = model(input_ids, attention_mask)
+                activations, input_ids, attention_mask, labels = activations.to(device), input_ids.to(device), attention_mask.to(device), labels.to(device)
+                outputs = model(activations, input_ids, attention_mask)
                 loss = criterion(outputs, labels)
                 total_test_loss += loss.item()
+                test_accuracy += (torch.argmax(outputs, dim=-1) == labels).sum().item()
+
 
                 if batch_idx == 0:
                     # Convert input_ids to strings
@@ -80,9 +79,9 @@ def train(model, train_dataset, test_dataset, learning_rate, epochs, batch_size)
 
         
         avg_test_loss = total_test_loss / len(test_loader)
-        test_losses.append(avg_test_loss)
+        avg_test_accuracy = test_accuracy / len(test_dataset)
         print(f"Epoch {epoch + 1}/{epochs}, Test Loss: {avg_test_loss}")
-        wandb.log({"test_loss": avg_test_loss})
+        wandb.log({"test_loss": avg_test_loss, "test_accuracy": avg_test_accuracy})
 
         scheduler.step()
 
@@ -93,8 +92,8 @@ def train(model, train_dataset, test_dataset, learning_rate, epochs, batch_size)
 
 def log_label_ratio(dataset, name):
     labels = []
-    for i in range(min(1000, len(dataset))):
-        labels.append(dataset[i][2].item())
+    for i in range(min(300, len(dataset))):
+        labels.append(dataset.get_label(i))
     
     true_count = sum(1 for item in labels if item == 1)
     false_count = len(labels) - true_count
@@ -113,7 +112,7 @@ if torch.cuda.is_available():
 
 BATCH_SIZE = 256
 hidden_size = 768
-learning_rate = 1e-6
+learning_rate = 1e-5
 epochs=5
 freeze = True
 setting='full'
@@ -128,12 +127,10 @@ wandb.init(project="imdb-gpt2-classification", config={
 })
 
 
-train_dataset, test_dataset = build_dataset(setting=setting)
-
+train_dataset, test_dataset = build_dataset(setting=setting, generate_embeddings=True)
 
 log_label_ratio(train_dataset, 'train')
 log_label_ratio(test_dataset, 'test')
-
 
 model = SimpleGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=MAX_SEQ_LEN, gpt_model_name='gpt2', freeze=True)
 model_parameters_info(model)
