@@ -1,5 +1,6 @@
 import torch.nn as nn
-from transformers import GPT2Model, GPT2ForSequenceClassification
+import torch
+from transformers import GPT2Model, GPT2ForSequenceClassification, GPT2Tokenizer
 from sae_lens import SAE
 from transformer_lens import HookedTransformer
 
@@ -19,6 +20,42 @@ class SimpleGPT2SequenceClassifier(nn.Module):
         linear_output = self.fc1(gpt_out.view(batch_size, -1))
         return linear_output
 
+
+
+# def classify_sentiment(model, batch):
+#     with torch.no_grad():
+#         outputs = model(input_ids=batch)
+#     logits = outputs.logits[:, -1, :]
+#     probabilities = softmax(logits, dim=-1)
+#     probabilities = probabilities[:, TOKENIZED_LABELS]
+#     predicted_idxs = torch.argmax(probabilities, dim=-1)
+#     predicted_sentiments = [LABELS[idx.item()] for idx in predicted_idxs]
+#     return predicted_sentiments
+
+# def classify_sentiment_generate(model, batch):
+#     outputs = model.generate(input_ids=batch, max_length=batch.shape[1] + 1, num_return_sequences=1)
+#     decoded_outputs = [tokenizer.decode(output) for output in outputs]
+#     predicted_sentiments = []
+#     for decoded_output in decoded_outputs:
+#         last_word = decoded_output.split()[-1].lower()
+#         if last_word in LABELS:
+#             predicted_sentiments.append(last_word)
+#         else:
+#             predicted_sentiments.append(classify_sentiment_random(model, [decoded_output])[0])
+#     return predicted_sentiments
+
+class RandomClassifier(torch.nn.Module):
+    def __init__(self):
+        super(RandomClassifier, self).__init__()
+
+    def forward(self, input_ids, attention_mask):
+        batch_size = input_ids.shape[0]
+        random_predictions = (torch.rand(1, batch_size) < 0.5).long()
+
+        one_hot_tensor = torch.zeros(batch_size, 2)
+        one_hot_tensor[torch.arange(batch_size), random_predictions[0]] = 1
+    
+        return one_hot_tensor
 
 class BigHeadGPT2SequenceClassifier(nn.Module):
     def __init__(self, hidden_size: int, max_seq_len: int, gpt_model_name: str, num_classes: int = 2, freeze=False):

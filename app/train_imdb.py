@@ -11,8 +11,7 @@ from app.constants import *
 from app.data import load_imdb
 from app.logging import MetricsLogger
 
-
-def train(metrics, model, train_dataset, test_dataset, learning_rate, epochs, batch_size, device=DEVICE):
+def train(metrics: MetricsLogger, model, train_dataset, test_dataset, learning_rate, epochs, batch_size, device=DEVICE):
     train_loader = DataLoader(train_dataset, batch_size=batch_size)
     test_loader = DataLoader(test_dataset, batch_size=batch_size)
 
@@ -61,9 +60,6 @@ def train(metrics, model, train_dataset, test_dataset, learning_rate, epochs, ba
         metrics.step_epoch()
 
     metrics.finalize()
-
-
-
 
 seed = 42
 torch.manual_seed(seed)
