@@ -8,7 +8,7 @@ from tqdm import tqdm
 from transformers import GPT2Tokenizer
 import wandb
 
-from app.models import SimpleGPT2SequenceClassifier
+from app.models import build_model
 from app.viz import model_parameters_info
 from app.constants import *
 from app.data import build_dataset
@@ -110,12 +110,13 @@ random.seed(seed)
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(seed)
 
-BATCH_SIZE = 256
+BATCH_SIZE = 254
 hidden_size = 768
 learning_rate = 1e-5
 epochs=5
 freeze = True
 setting='full'
+model_name = 'big-head'
 wandb.init(project="imdb-gpt2-classification", config={
     "batch_size": BATCH_SIZE,
     "learning_rate": learning_rate,
@@ -123,16 +124,18 @@ wandb.init(project="imdb-gpt2-classification", config={
     "max_seq_len": MAX_SEQ_LEN,
     "hidden_size": hidden_size,
     "freeze": freeze,
-    "setting": setting
+    "setting": setting,
+    "model_name": model_name
 })
 
 
-train_dataset, test_dataset = build_dataset(setting=setting, generate_embeddings=True)
+train_dataset, test_dataset = build_dataset(setting=setting, generate_embeddings=False)
 
 log_label_ratio(train_dataset, 'train')
 log_label_ratio(test_dataset, 'test')
 
-model = SimpleGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=MAX_SEQ_LEN, gpt_model_name='gpt2', freeze=True)
+model = build_model(model_name, gpt_model_name='gpt2', hidden_size=hidden_size, freeze=freeze, max_seq_len=MAX_SEQ_LEN, device=DEVICE)
+
 model_parameters_info(model)
 
 train(model, train_dataset, test_dataset, batch_size=BATCH_SIZE, epochs=epochs, learning_rate=learning_rate)

@@ -26,6 +26,7 @@ class IMDBDataset(Dataset):
         label = torch.tensor(item['label'])
 
         if 'activations' in item:
+            print(type(item['activations']))
             activation = torch.tensor(item['activations'])
         else:
             activation = torch.zeros(1, 1)
