@@ -13,9 +13,55 @@ from app.viz import model_parameters_info
 from app.constants import *
 from app.data import load_imdb
 
+class MetricsLogger():
+    def __init__(self):
+        self.batch1_table = wandb.Table(columns=["epoch", "idx", "input_text", "label", "prediction", "logits"])
+        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+        self.train_losses = []
+        self.train_acc = []
+        self.test_losses = []
+        self.test_acc = []
+        self.epoch = 0
+
+    def step_epoch(self):
+        avg_train_loss = sum(self.train_losses) / len(self.train_losses)
+        avg_train_accuracy = sum(self.train_acc) / len(self.train_acc)
+        self.train_losses = []
+        self.train_acc = []
+        print(f"Epoch {self.epoch + 1}/{epochs}, Train Loss: {avg_train_loss}")
+        wandb.log({"train_loss": avg_train_loss, "train_accuracy": avg_train_accuracy})
+
+        avg_test_loss = sum(self.test_losses) / len(self.test_losses)
+        avg_test_accuracy = sum(self.test_acc) / len(self.test_acc)
+        print(f"Epoch {self.epoch + 1}/{epochs}, Test Loss: {avg_test_loss}")
+        wandb.log({"test_loss": avg_test_loss, "test_accuracy": avg_test_accuracy})
+
+
+        self.epoch += 1
+
+    def log_train_batch(self, loss, labels, outputs, lr):
+        self.train_losses.append(loss)
+        self.train_acc.append((torch.argmax(outputs, dim=-1) == labels).sum().item())
+        wandb.log({"train_batch_loss": loss, "batch_learning_rate": lr})
+
+    def log_test_batch(self, batch_idx, loss, labels, outputs, input_ids):
+        self.test_losses.append(loss)
+        self.test_acc.append((torch.argmax(outputs, dim=-1) == labels).sum().item())
+
+        if batch_idx == 0:
+            input_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in input_ids[:4]]
+
+            predictions = torch.argmax(outputs, dim=-1)
+
+            for i in range(min(len(input_texts), 4)):
+                self.batch1_table.add_data(self.epoch, i, input_texts[i], labels[i], predictions[i], outputs[i])
+
+    def finalize(self):
+        wandb.log({f"batch_1": self.batch1_table})
+        wandb.finish()
+
 def train(model, train_dataset, test_dataset, learning_rate, epochs, batch_size, device=DEVICE):
-    batch1_table = wandb.Table(columns=["epoch", "idx", "input_text", "label", "prediction", "logits"])
-    tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+    metrics = MetricsLogger()
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size)
     test_loader = DataLoader(test_dataset, batch_size=batch_size)
@@ -28,8 +74,6 @@ def train(model, train_dataset, test_dataset, learning_rate, epochs, batch_size,
 
     for epoch in range(epochs):
         model.train()
-        total_train_loss = 0
-        total_train_accuracy = 0
 
         for input_ids, attention_mask, labels in tqdm(train_loader):
             input_ids, attention_mask, labels = input_ids.to(device), attention_mask.to(device), labels.to(device)
@@ -39,18 +83,14 @@ def train(model, train_dataset, test_dataset, learning_rate, epochs, batch_size,
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
-            
-            total_train_loss += loss.item()
-            total_train_accuracy += (torch.argmax(outputs, dim=-1) == labels).sum().item()
-            wandb.log({"train_batch_loss": loss.item(), "batch_learning_rate": scheduler.get_last_lr()[0]})
-        
-        avg_train_loss = total_train_loss / len(train_loader)
-        avg_train_accuracy = total_train_accuracy / len(train_dataset)
-        print(f"Epoch {epoch + 1}/{epochs}, Train Loss: {avg_train_loss}")
-        wandb.log({"train_loss": avg_train_loss, "train_accuracy": avg_train_accuracy})
 
-        total_test_loss = 0
-        test_accuracy = 0
+            metrics.log_train_batch(
+                loss=loss.item(), 
+                labels=labels, 
+                outputs=outputs, 
+                lr=scheduler.get_last_lr()[0]
+            )
+
         model.eval()
         with torch.no_grad():
             for batch_idx, (input_ids, attention_mask, labels) in tqdm(enumerate(test_loader)):
@@ -58,31 +98,20 @@ def train(model, train_dataset, test_dataset, learning_rate, epochs, batch_size,
                 
                 outputs = model(input_ids, attention_mask)
                 loss = criterion(outputs, labels)
-                total_test_loss += loss.item()
-                test_accuracy += (torch.argmax(outputs, dim=-1) == labels).sum().item()
 
-                if batch_idx == 0:
-                    # Convert input_ids to strings
-                    input_texts = [tokenizer.decode(ids, skip_special_tokens=True) for ids in input_ids[:4]]
-
-                    # Get predictions and labels
-                    predictions = torch.argmax(outputs, dim=-1)
-
-
-                    # Log details to Weights and Biases
-                    for i in range(min(len(input_texts), 4)):
-                        batch1_table.add_data(epoch, i, input_texts[i], labels[i], predictions[i], outputs[i])
-
-        
-        avg_test_loss = total_test_loss / len(test_loader)
-        avg_test_accuracy = test_accuracy / len(test_dataset)
-        print(f"Epoch {epoch + 1}/{epochs}, Test Loss: {avg_test_loss}")
-        wandb.log({"test_loss": avg_test_loss, "test_accuracy": avg_test_accuracy})
+                metrics.log_test_batch(
+                    batch_idx=batch_idx,
+                    loss=loss.item(),
+                    labels=labels,
+                    outputs=outputs,
+                    input_ids=input_ids,
+                )
 
         scheduler.step()
+        metrics.step_epoch()
 
-    wandb.log({f"batch_1": batch1_table})
-    wandb.finish()
+    metrics.finalize()
+
 
 def log_label_ratio(dataset, name):
     labels = []
