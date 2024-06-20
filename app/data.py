@@ -25,58 +25,51 @@ class IMDBDataset(Dataset):
         attention_mask = torch.tensor(item['attention_mask'])
         label = torch.tensor(item['label'])
 
-        if 'activations' in item:
-            print(type(item['activations']))
-            activation = torch.tensor(item['activations'])
+        return input_ids, attention_mask, label
+
+
+def _build_dataset(data_mode):
+    tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+    tokenizer.pad_token = tokenizer.eos_token 
+    dataset = load_dataset('imdb')
+
+    if data_mode in ['dry-run', 'one-batch']:
+        if data_mode == 'dry-run':
+            max_samples=100
+        elif data_mode == 'one-batch':
+            max_samples=4
         else:
-            activation = torch.zeros(1, 1)
+            raise ValueError
 
-        return activation, input_ids, attention_mask, label
+        dataset['train'] = dataset['train'].shuffle().select(range(max_samples))
+        dataset['test'] = dataset['test'].shuffle().select(range(max_samples))
 
-def build_dataset(setting, generate_embeddings=False, device='cuda') -> IMDBDataset:
-    if setting not in ['one-batch', 'dry-run', 'full']:
-        raise ValueError(f"Invalid setting: {setting}")
-    ds_name = setting
+    del dataset['unsupervised'] 
+
+    def tokenize_function(examples):
+        return tokenizer(examples['text'], padding='max_length', truncation=True, max_length=MAX_SEQ_LEN)
+
+    dataset = dataset.map(tokenize_function, batched=True)
+
+    return dataset
+
+def load_imdb(data_mode) -> IMDBDataset:
+    if data_mode not in ['one-batch', 'dry-run', 'full']:
+        raise ValueError(f"Invalid setting: {data_mode}")
+    ds_name = data_mode
     
-    embeddings = '-embeddings' if generate_embeddings else ''
-    dataset_local = os.path.join('cruft', 'datasets', f'imdb-{ds_name}{embeddings}.pt')
+    local_file = os.path.join('cruft', 'datasets', f'imdb-{ds_name}.pt')
 
-    if os.path.exists(dataset_local):
-        print(f"Loading dataset from {dataset_local}")
-        dataset = torch.load(dataset_local)
+    if os.path.exists(local_file):
+        print(f"Loading dataset from {local_file}")
+        dataset = torch.load(local_file)
     else:
         print("Building dataset...")
-        tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-        tokenizer.pad_token = tokenizer.eos_token 
-        dataset = load_dataset('imdb')
+        dataset = _build_dataset(data_mode)
 
-        if setting == 'dry-run':
-            max_samples=100
-        elif setting == 'one-batch':
-            max_samples=4
-
-        if setting in ['dry-run', 'one-batch']:
-            dataset['train'] = dataset['train'].shuffle().select(range(max_samples))
-            dataset['test'] = dataset['test'].shuffle().select(range(max_samples))
-
-        del dataset['unsupervised'] 
-
-        def tokenize_function(examples):
-            return tokenizer(examples['text'], padding='max_length', truncation=True, max_length=MAX_SEQ_LEN)
-
-        dataset = dataset.map(tokenize_function, batched=True)
-
-        if generate_embeddings:
-            activation_model = ActivationModel('gpt2', SAE_EMBEDDING_LAYER_NAME, SAE_EMBEDDING_LAYER_NUMBER, device=device)
-
-            def embed(examples):
-                return {'activations': activation_model(torch.tensor(examples['input_ids']), torch.tensor(examples['attention_mask']))}
-
-            dataset = dataset.map(embed, batched=True, batch_size=MAX_GPT2_BATCH_SIZE)
-  
-        os.makedirs(os.path.dirname(dataset_local), exist_ok=True)
-        torch.save(dataset, dataset_local)
-        print(f"Dataset saved to {dataset_local}")
+        os.makedirs(os.path.dirname(local_file), exist_ok=True)
+        torch.save(dataset, local_file)
+        print(f"Dataset saved to {local_file}")
 
     train_dataset = IMDBDataset(dataset['train'].shuffle())
     test_dataset = IMDBDataset(dataset['test'].shuffle())

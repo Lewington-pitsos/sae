@@ -1,5 +1,8 @@
+import torch
+
 MAX_SEQ_LEN = 128
 SAE_EMBEDDING_LAYER_NAME = 'blocks.8.hook_resid_pre'
 SAE_EMBEDDING_LAYER_NUMBER=8
 MAX_GPT2_BATCH_SIZE=256
-DEVICE = 'cuda'
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

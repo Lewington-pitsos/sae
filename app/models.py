@@ -13,7 +13,7 @@ class SimpleGPT2SequenceClassifier(nn.Module):
                 param.requires_grad = False
         self.fc1 = nn.Linear(hidden_size * max_seq_len, num_classes)
 
-    def forward(self, activations, input_id, mask):
+    def forward(self, input_id, mask):
         gpt_out = self.gpt2model(input_ids=input_id, attention_mask=mask).last_hidden_state
         batch_size = gpt_out.shape[0]
         linear_output = self.fc1(gpt_out.view(batch_size, -1))
@@ -32,7 +32,7 @@ class BigHeadGPT2SequenceClassifier(nn.Module):
         self.activation = nn.ReLU()
         self.fc2 = nn.Linear(head_hidden_size * max_seq_len, num_classes)
 
-    def forward(self, activations, input_id, mask):
+    def forward(self, input_id, mask):
         gpt_out = self.gpt2model(input_ids=input_id, attention_mask=mask).last_hidden_state
         x = self.fc1(gpt_out)
         x = self.activation(x)
@@ -82,7 +82,7 @@ class SAEClassifier(nn.Module):
         for param in self.model.parameters():
             param.requires_grad = False
 
-    def forward(self, _, input_ids, attention_mask=None):
+    def forward(self, input_ids, attention_mask=None):
         _, cache = self.model.run_with_cache(input_ids, attention_mask=attention_mask, prepend_bos=True, stop_at_layer=self.hook_layer + 1)
 
         activations = cache[self.hook_name]
