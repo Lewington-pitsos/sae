@@ -29,28 +29,28 @@ class MetricsLogger():
         avg_train_accuracy = sum(self.train_acc) / len(self.train_acc)
         self.train_losses = []
         self.train_acc = []
-        print(f"Epoch {self.epoch + 1}, Train Loss: {avg_train_loss}")
+        print(f"Epoch {self.epoch + 1}, Train Loss: {avg_train_loss}, Train Accuracy: {avg_train_accuracy}")
 
         avg_test_loss = sum(self.test_losses) / len(self.test_losses)
         avg_test_accuracy = sum(self.test_acc) / len(self.test_acc)
-        print(f"Epoch {self.epoch + 1}, Test Loss: {avg_test_loss}")
+        print(f"Epoch {self.epoch + 1}, Test Loss: {avg_test_loss}, Test Accuracy: {avg_test_accuracy}")
 
         if not self.skip_wandb:
             wandb.log({"train_loss": avg_train_loss, "train_accuracy": avg_train_accuracy})
             wandb.log({"test_loss": avg_test_loss, "test_accuracy": avg_test_accuracy})
 
-
         self.epoch += 1
 
     def log_train_batch(self, loss, labels, outputs, lr):
         self.train_losses.append(loss)
-        self.train_acc.append((torch.argmax(outputs, dim=-1) == labels).sum().item())
+        acc = ((torch.argmax(outputs, dim=-1) == labels) * 1.0).mean().item()
+        self.train_acc.append(acc)
         if not self.skip_wandb:
-            wandb.log({"train_batch_loss": loss, "batch_learning_rate": lr})
+            wandb.log({"train_batch_loss": loss, "batch_learning_rate": lr, "train_batch_accuracy": acc})
 
     def log_test_batch(self, batch_idx, loss, labels, outputs, input_ids):
         self.test_losses.append(loss)
-        self.test_acc.append((torch.argmax(outputs, dim=-1) == labels).sum().item())
+        self.test_acc.append(((torch.argmax(outputs, dim=-1) == labels) * 1.0).mean().item())
 
         if batch_idx == 0 and not self.skip_wandb:
             input_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in input_ids[:4]]
