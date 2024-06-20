@@ -1,83 +1,17 @@
-import os
 import random
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset
-from datasets import load_dataset
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import GPT2Tokenizer
 import wandb
 
 from app.models import SimpleGPT2SequenceClassifier
 from app.viz import model_parameters_info
-
-class IMDBDataset(Dataset):
-    def __init__(self, tokenized_dataset):
-        self.tokenized_dataset = tokenized_dataset
-
-    def __len__(self):
-        return len(self.tokenized_dataset)
-
-    def __getitem__(self, idx):
-        item = self.tokenized_dataset[idx]
-        input_ids = torch.tensor(item['input_ids'])
-        attention_mask = torch.tensor(item['attention_mask'])
-        label = torch.tensor(item['label'])
-        return input_ids, attention_mask, label
-
-def build_dataset(setting) -> IMDBDataset:
-    if setting not in ['one-batch', 'dry-run', 'full']:
-        raise ValueError(f"Invalid setting: {setting}")
-
-    def print_label_ratio(dataset, name):
-        true_count = sum(1 for item in dataset.tokenized_dataset if item['label'] == 1)
-        false_count = len(dataset) - true_count
-        print(f"{name} True labels: {true_count}, False labels: {false_count}")
-        print(f"{name} Ratio (True/False): {true_count/false_count:.2f}")
-
-        wandb.log({f"{name}_data_true_count": true_count, f"{name}_data_false_count": false_count, f"{name}_data_ratio": true_count/false_count})
-
-    ds_name = setting
-    dataset_local = os.path.join('cruft', 'datasets', f'imdb-{ds_name}.pt')
-
-    if os.path.exists(dataset_local):
-        print(f"Loading dataset from {dataset_local}")
-        tokenized_datasets = torch.load(dataset_local)
-    else:
-        print("Building dataset...")
-        tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-        tokenizer.pad_token = tokenizer.eos_token 
-        dataset = load_dataset('imdb')
-
-        if setting == 'dry-run':
-            max_samples=100
-        elif setting == 'one-batch':
-            max_samples=4
-
-        if setting in ['dry-run', 'one-batch']:
-            dataset['train'] = dataset['train'].shuffle().select(range(max_samples))
-            dataset['test'] = dataset['test'].shuffle().select(range(max_samples))
-
-        del dataset['unsupervised'] 
-
-        def tokenize_function(examples):
-            return tokenizer(examples['text'], padding='max_length', truncation=True, max_length=MAX_SEQ_LEN)
-
-        tokenized_datasets = dataset.map(tokenize_function, batched=True)
-
-        os.makedirs(os.path.dirname(dataset_local), exist_ok=True)
-        torch.save(tokenized_datasets, dataset_local)
-        print(f"Dataset saved to {dataset_local}")
-
-    train_dataset = IMDBDataset(tokenized_datasets['train'])
-    test_dataset = IMDBDataset(tokenized_datasets['test'])
-
-    print_label_ratio(train_dataset, 'train')
-    print_label_ratio(test_dataset, 'test')
-
-    return train_dataset, test_dataset
+from app.constants import *
+from app.data import build_dataset
 
 def train(model, train_dataset, test_dataset, learning_rate, epochs, batch_size):
     
@@ -91,6 +25,7 @@ def train(model, train_dataset, test_dataset, learning_rate, epochs, batch_size)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.9)
 
     # Training loop
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -112,6 +47,7 @@ def train(model, train_dataset, test_dataset, learning_rate, epochs, batch_size)
             optimizer.step()
             
             total_loss += loss.item()
+            wandb.log({"train_batch_loss": loss.item(), "batch_learning_rate": scheduler.get_last_lr()[0]})
         
         avg_train_loss = total_loss / len(train_loader)
         train_losses.append(avg_train_loss)
@@ -148,10 +84,25 @@ def train(model, train_dataset, test_dataset, learning_rate, epochs, batch_size)
         print(f"Epoch {epoch + 1}/{epochs}, Test Loss: {avg_test_loss}")
         wandb.log({"test_loss": avg_test_loss})
 
+        scheduler.step()
+
     wandb.log({
         f"batch_1": batch1_table,
     })
     wandb.finish()
+
+def log_label_ratio(dataset, name):
+    labels = []
+    for i in range(min(1000, len(dataset))):
+        labels.append(dataset[i][2].item())
+    
+    true_count = sum(1 for item in labels if item == 1)
+    false_count = len(labels) - true_count
+    print(f"{name} True labels: {true_count}, False labels: {false_count}")
+    print(f"{name} Ratio (True/False): {true_count/false_count:.2f}")
+
+    wandb.log({f"{name}_data_true_count": true_count, f"{name}_data_false_count": false_count, f"{name}_data_TF_ratio": true_count/false_count})
+
 
 seed = 42
 torch.manual_seed(seed)
@@ -160,13 +111,12 @@ random.seed(seed)
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(seed)
 
-MAX_SEQ_LEN = 1024
-BATCH_SIZE = 16
+BATCH_SIZE = 256
 hidden_size = 768
-learning_rate = 1e-5
-epochs=100
+learning_rate = 1e-6
+epochs=5
 freeze = True
-setting='one-batch'
+setting='full'
 wandb.init(project="imdb-gpt2-classification", config={
     "batch_size": BATCH_SIZE,
     "learning_rate": learning_rate,
@@ -179,6 +129,11 @@ wandb.init(project="imdb-gpt2-classification", config={
 
 
 train_dataset, test_dataset = build_dataset(setting=setting)
+
+
+log_label_ratio(train_dataset, 'train')
+log_label_ratio(test_dataset, 'test')
+
 
 model = SimpleGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=MAX_SEQ_LEN, gpt_model_name='gpt2', freeze=True)
 model_parameters_info(model)

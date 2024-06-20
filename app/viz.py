@@ -24,4 +24,4 @@ def model_parameters_info(model: nn.Module):
 
     # log to wandb too 
 
-    wandb.log({"total_parameters": total_params, "trainable_parameters": trainable_params, "non_trainable_parameters": non_trainable_params, "ratio": ratio})
+    wandb.log({"total_parameters": total_params, "trainable_parameters": trainable_params, "non_trainable_parameters": non_trainable_params, "trainable_parameter_ratio": ratio})

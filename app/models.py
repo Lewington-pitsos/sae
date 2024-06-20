@@ -15,3 +15,6 @@ class SimpleGPT2SequenceClassifier(nn.Module):
         batch_size = gpt_out.shape[0]
         linear_output = self.fc1(gpt_out.view(batch_size, -1))
         return linear_output
+
+class Embedder():
+    pass
