@@ -3,7 +3,7 @@ from transformers import GPT2Model
 
 
 class SimpleGPT2SequenceClassifier(nn.Module):
-    def __init__(self, hidden_size: int, num_classes: int, max_seq_len: int, gpt_model_name: str):
+    def __init__(self, hidden_size: int, max_seq_len: int, gpt_model_name: str, num_classes: int = 2):
         super(SimpleGPT2SequenceClassifier, self).__init__()
         self.gpt2model = GPT2Model.from_pretrained(gpt_model_name)
         self.fc1 = nn.Linear(hidden_size * max_seq_len, num_classes)
