@@ -1,17 +1,7 @@
 import torch.nn as nn
 import wandb
 
-def model_parameters_info(model: nn.Module):
-    """
-    Prints the number of trainable and non-trainable parameters in the model
-    as well as the ratio of trainable to non-trainable parameters.
-    
-    Args:
-    model (nn.Module): The model to analyze.
-    
-    Returns:
-    None
-    """
+def log_model_parameters_info(model: nn.Module, skip_wandb: bool = False):
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     non_trainable_params = total_params - trainable_params
@@ -22,6 +12,5 @@ def model_parameters_info(model: nn.Module):
     print(f"Non-trainable parameters: {non_trainable_params:,} (roughly {non_trainable_params:.2e})")
     print(f"Ratio (Trainable/Non-trainable): {ratio:,} (roughly {ratio:.2e})")
 
-    # log to wandb too 
-
-    wandb.log({"total_parameters": total_params, "trainable_parameters": trainable_params, "non_trainable_parameters": non_trainable_params, "trainable_parameter_ratio": ratio})
+    if not skip_wandb:
+        wandb.log({"total_parameters": total_params, "trainable_parameters": trainable_params, "non_trainable_parameters": non_trainable_params, "trainable_parameter_ratio": ratio})

@@ -5,64 +5,14 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from transformers import GPT2Tokenizer
-import wandb
 
 from app.models import build_model
-from app.viz import model_parameters_info
 from app.constants import *
 from app.data import load_imdb
-
-class MetricsLogger():
-    def __init__(self):
-        self.batch1_table = wandb.Table(columns=["epoch", "idx", "input_text", "label", "prediction", "logits"])
-        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-        self.train_losses = []
-        self.train_acc = []
-        self.test_losses = []
-        self.test_acc = []
-        self.epoch = 0
-
-    def step_epoch(self):
-        avg_train_loss = sum(self.train_losses) / len(self.train_losses)
-        avg_train_accuracy = sum(self.train_acc) / len(self.train_acc)
-        self.train_losses = []
-        self.train_acc = []
-        print(f"Epoch {self.epoch + 1}/{epochs}, Train Loss: {avg_train_loss}")
-        wandb.log({"train_loss": avg_train_loss, "train_accuracy": avg_train_accuracy})
-
-        avg_test_loss = sum(self.test_losses) / len(self.test_losses)
-        avg_test_accuracy = sum(self.test_acc) / len(self.test_acc)
-        print(f"Epoch {self.epoch + 1}/{epochs}, Test Loss: {avg_test_loss}")
-        wandb.log({"test_loss": avg_test_loss, "test_accuracy": avg_test_accuracy})
+from app.logging import MetricsLogger
 
 
-        self.epoch += 1
-
-    def log_train_batch(self, loss, labels, outputs, lr):
-        self.train_losses.append(loss)
-        self.train_acc.append((torch.argmax(outputs, dim=-1) == labels).sum().item())
-        wandb.log({"train_batch_loss": loss, "batch_learning_rate": lr})
-
-    def log_test_batch(self, batch_idx, loss, labels, outputs, input_ids):
-        self.test_losses.append(loss)
-        self.test_acc.append((torch.argmax(outputs, dim=-1) == labels).sum().item())
-
-        if batch_idx == 0:
-            input_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in input_ids[:4]]
-
-            predictions = torch.argmax(outputs, dim=-1)
-
-            for i in range(min(len(input_texts), 4)):
-                self.batch1_table.add_data(self.epoch, i, input_texts[i], labels[i], predictions[i], outputs[i])
-
-    def finalize(self):
-        wandb.log({f"batch_1": self.batch1_table})
-        wandb.finish()
-
-def train(model, train_dataset, test_dataset, learning_rate, epochs, batch_size, device=DEVICE):
-    metrics = MetricsLogger()
-
+def train(metrics, model, train_dataset, test_dataset, learning_rate, epochs, batch_size, device=DEVICE):
     train_loader = DataLoader(train_dataset, batch_size=batch_size)
     test_loader = DataLoader(test_dataset, batch_size=batch_size)
 
@@ -113,17 +63,6 @@ def train(model, train_dataset, test_dataset, learning_rate, epochs, batch_size,
     metrics.finalize()
 
 
-def log_label_ratio(dataset, name):
-    labels = []
-    for i in range(min(300, len(dataset))):
-        labels.append(dataset.get_label(i))
-    
-    true_count = sum(1 for item in labels if item == 1)
-    false_count = len(labels) - true_count
-    print(f"{name} True labels: {true_count}, False labels: {false_count}")
-    print(f"{name} Ratio (True/False): {true_count/false_count:.2f}")
-
-    wandb.log({f"{name}_data_true_count": true_count, f"{name}_data_false_count": false_count, f"{name}_data_TF_ratio": true_count/false_count})
 
 
 seed = 42
@@ -133,14 +72,18 @@ random.seed(seed)
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(seed)
 
-BATCH_SIZE = 8
+BATCH_SIZE = 16
 hidden_size = 768
 learning_rate = 1e-5
-epochs=5
+epochs=100
 freeze = True
 data_mode='one-batch'
 model_name = 'big-head'
-wandb.init(project="imdb-gpt2-classification", config={
+skip_wandb = True
+
+metrics = MetricsLogger(skip_wandb=skip_wandb)
+
+metrics.init(project="imdb-gpt2-classification", config={
     "batch_size": BATCH_SIZE,
     "learning_rate": learning_rate,
     "num_epochs": epochs,
@@ -153,12 +96,10 @@ wandb.init(project="imdb-gpt2-classification", config={
 
 
 train_dataset, test_dataset = load_imdb(data_mode=data_mode)
-
-log_label_ratio(train_dataset, 'train')
-log_label_ratio(test_dataset, 'test')
+metrics.log_label_ratio(train_dataset, 'train')
+metrics.log_label_ratio(test_dataset, 'test')
 
 model = build_model(model_name, gpt_model_name='gpt2', hidden_size=hidden_size, freeze=freeze, max_seq_len=MAX_SEQ_LEN, device=DEVICE)
+metrics.log_model_params(model)
 
-model_parameters_info(model)
-
-train(model, train_dataset, test_dataset, batch_size=BATCH_SIZE, epochs=epochs, learning_rate=learning_rate, device=DEVICE)
+train(metrics, model, train_dataset, test_dataset, batch_size=BATCH_SIZE, epochs=epochs, learning_rate=learning_rate, device=DEVICE)
