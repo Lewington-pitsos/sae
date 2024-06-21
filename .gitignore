@@ -8,3 +8,4 @@ cruft/*
 
 wandb
 .params.json
+pad.ipynb
