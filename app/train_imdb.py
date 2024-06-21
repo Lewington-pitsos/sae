@@ -74,11 +74,11 @@ def _set_seed():
 def run(params):
 
     _set_seed()
-    metrics = MetricsLogger(skip_wandb=params['skip_wandb'])
+    metrics = MetricsLogger(model_name=params['model_name'], skip_wandb=params['skip_wandb'])
 
     metrics.init(project="imdb-gpt2-classification", config=params.copy())
 
-    train_dataset, test_dataset = load_imdb(data_mode=params['data_mode'], max_seq_len=params['max_seq_len'])
+    train_dataset, test_dataset = load_imdb(data_mode=params['data_mode'], max_seq_len=params['max_seq_len'], model_name=params['model_name'])
     metrics.log_label_ratio(train_dataset, 'train')
     metrics.log_label_ratio(test_dataset, 'test')
 
@@ -96,16 +96,15 @@ def run(params):
     train(metrics, model, train_dataset, test_dataset, batch_size=params['batch_size'], epochs=params['epochs'], lr=params['lr'], device=DEVICE)
 
 base_params = {
-        "batch_size": 256,
+        "batch_size": 16,
         "hidden_size": 768,
-        "lr": 1e-4,
+        "lr": 1e-5,
         "epochs": 5,
         "freeze": True,
         "data_mode": "full",
-        "model_name": "sae-classifier",
+        "model_name": "sae-classifier-mistral7b",
         "skip_wandb": False,
         "max_seq_len": 256,
-        "top_k": None
 }
 
 a = base_params.copy()

@@ -4,15 +4,16 @@ import torch
 from transformers import GPT2Tokenizer
 
 from app.viz import log_model_parameters_info
+from app.tok import load_tokenizer
 
 class MetricsLogger():
-    def __init__(self, skip_wandb=False):
+    def __init__(self, model_name, skip_wandb=False):
         if not skip_wandb:
             self.batch1_table = wandb.Table(columns=["epoch", "idx", "input_text", "label", "prediction", "logits"])
         else:
             self.batch1_table = None
 
-        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+        self.tokenizer = load_tokenizer(model_name)
         self.train_losses = []
         self.train_acc = []
         self.test_losses = []
