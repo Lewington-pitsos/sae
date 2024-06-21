@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch
-from transformers import GPT2Model, GPT2ForSequenceClassification, GPT2Tokenizer
+from transformers import GPT2Model, GPT2ForSequenceClassification, GPT2Tokenizer, PretrainedConfig, AutoConfig
 from sae_lens import SAE
 from transformer_lens import HookedTransformer
 
@@ -12,10 +12,10 @@ class SimpleGPT2SequenceClassifier(nn.Module):
         if freeze:
             for param in self.gpt2model.parameters():
                 param.requires_grad = False
-        self.fc1 = nn.Linear(hidden_size * max_seq_len, num_classes)
+        self.fc1 = nn.Linear(hidden_size * max_seq_len, num_classes, bias=False)
 
-    def forward(self, input_id, mask):
-        gpt_out = self.gpt2model(input_ids=input_id, attention_mask=mask).last_hidden_state
+    def forward(self, input_ids, attention_mask):
+        gpt_out = self.gpt2model(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
         batch_size = gpt_out.shape[0]
         linear_output = self.fc1(gpt_out.view(batch_size, -1))
         return linear_output
@@ -62,8 +62,39 @@ class RandomClassifier(torch.nn.Module):
 
         return x
 
+def save_tensor_activations(tensor, file_prefix='activation'):
+    import matplotlib.pyplot as plt
+    # Check the shape of the tensor
+    if tensor.ndim != 3 or tensor.shape[0] != 2:
+        raise ValueError("Tensor must be of shape [2, 50, 768]")
+    
+    for i in range(tensor.shape[0]):
+        activation = tensor[i].detach().numpy()  # Convert to numpy array
+        plt.imshow(activation, aspect='auto', cmap='viridis')
+        plt.colorbar()
+        plt.title(f'Activation {i+1}')
+        plt.xlabel('Features')
+        plt.ylabel('Activation Index')
+        plt.savefig(f'{file_prefix}_{i+1}.png')
+        plt.close()
+
+
+def order_invariant_topk(input_tensor, k, input_dim):
+    _, indices = torch.topk(torch.abs(input_tensor), k, dim=input_dim, sorted=False)
+
+    sorted_indices = torch.sort(indices, dim=input_dim)[0]
+    return torch.gather(input_tensor, dim=input_dim, index=sorted_indices)
+
 class BigHeadGPT2SequenceClassifier(nn.Module):
-    def __init__(self, hidden_size: int, max_seq_len: int, gpt_model_name: str, num_classes: int = 2, freeze=False):
+    def __init__(self, 
+            hidden_size: int, 
+            max_seq_len: int, 
+            gpt_model_name: str, 
+            num_classes: int = 2, 
+            freeze=False, 
+            mask_hidden_state=True,
+            top_k=128,
+        ):
         super(BigHeadGPT2SequenceClassifier, self).__init__()
         self.gpt2model = GPT2Model.from_pretrained(gpt_model_name)
         if freeze:
@@ -72,10 +103,16 @@ class BigHeadGPT2SequenceClassifier(nn.Module):
         head_hidden_size = 8192
         self.fc1 = nn.Linear(hidden_size, head_hidden_size)
         self.activation = nn.ReLU()
-        self.fc2 = nn.Linear(head_hidden_size * max_seq_len, num_classes)
+        self.fc2 = nn.Linear(head_hidden_size * top_k, num_classes, bias=False)
+        self.mask_hidden_state = mask_hidden_state
+        self.top_k = top_k
 
-    def forward(self, input_id, mask):
-        gpt_out = self.gpt2model(input_ids=input_id, attention_mask=mask).last_hidden_state
+    def forward(self, input_ids, attention_mask):
+        gpt_out = self.gpt2model(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
+        if self.mask_hidden_state:
+            gpt_out = gpt_out * attention_mask.unsqueeze(-1).clip(1e-4, 1) 
+            gpt_out = order_invariant_topk(gpt_out, self.top_k, 1)
+
         x = self.fc1(gpt_out)
         x = self.activation(x)
         x = x.view(x.shape[0], -1)
@@ -94,7 +131,7 @@ class ActivationModel(nn.Module):
         for param in self.model.parameters():
             param.requires_grad = False
 
-    def forward(self, input_ids, attention_mask=None):
+    def forward(self, input_ids, attention_mask):
         _, cache = self.model.run_with_cache(input_ids, attention_mask=attention_mask, prepend_bos=True, stop_at_layer=self.hook_layer + 1)
 
         return cache[self.hook_name]
@@ -124,7 +161,7 @@ class SAEClassifier(nn.Module):
         for param in self.model.parameters():
             param.requires_grad = False
 
-    def forward(self, input_ids, attention_mask=None):
+    def forward(self, input_ids, attention_mask):
         _, cache = self.model.run_with_cache(input_ids, attention_mask=attention_mask, prepend_bos=True, stop_at_layer=self.hook_layer + 1)
 
         activations = cache[self.hook_name]
@@ -136,14 +173,33 @@ class SAEClassifier(nn.Module):
         x = self.fc1(features)
         return x
 
-def build_model(model_name, hidden_size, max_seq_len, gpt_model_name, freeze, device):
+class GPT2Classifier(nn.Module):
+    def __init__(self, gpt_model_name):
+        super(GPT2Classifier, self).__init__()
+
+        config = AutoConfig.from_pretrained(gpt_model_name)
+        config.num_labels = 2
+        config.pad_token_id = config.eos_token_id
+        config.problem_type = "single_label_classification"
+        self.model = GPT2ForSequenceClassification.from_pretrained(gpt_model_name, config=config)
+
+        for param in self.model.transformer.parameters():
+            param.requires_grad = False
+
+
+    def forward(self, input_ids, attention_mask):
+        return self.model(input_ids=input_ids, attention_mask=attention_mask).logits
+
+def build_model(model_name, hidden_size, max_seq_len, gpt_model_name, freeze, top_k, device):
     if model_name == 'simple':
         return SimpleGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=max_seq_len, gpt_model_name=gpt_model_name, freeze=freeze)
     elif model_name == 'big-head':
-        return BigHeadGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=max_seq_len, gpt_model_name=gpt_model_name, freeze=freeze)
+        return BigHeadGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=max_seq_len, gpt_model_name=gpt_model_name, freeze=freeze, top_k=top_k)
     elif model_name == 'sae-classifier':
         return SAEClassifier(gpt_model_name=gpt_model_name, hook_name='blocks.8.hook_resid_pre', hook_layer=8, device=device, max_seq_len=max_seq_len)
     elif model_name == 'random':
         return RandomClassifier()
-
+    elif model_name == 'gpt2-classifier': 
+        return GPT2Classifier(gpt_model_name).to(device)
+        
     raise ValueError(f"Invalid model name: {model_name}")

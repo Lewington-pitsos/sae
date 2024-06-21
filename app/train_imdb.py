@@ -28,7 +28,7 @@ def train(metrics: MetricsLogger, model, train_dataset, test_dataset, lr, epochs
             input_ids, attention_mask, labels = input_ids.to(device), attention_mask.to(device), labels.to(device)
             
             optimizer.zero_grad()
-            outputs = model(input_ids, attention_mask)
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -45,7 +45,7 @@ def train(metrics: MetricsLogger, model, train_dataset, test_dataset, lr, epochs
             for batch_idx, (input_ids, attention_mask, labels) in tqdm(enumerate(test_loader)):
                 input_ids, attention_mask, labels = input_ids.to(device), attention_mask.to(device), labels.to(device)
                 
-                outputs = model(input_ids, attention_mask)
+                outputs = model(input_ids=input_ids, attention_mask=attention_mask)
                 loss = criterion(outputs, labels)
 
                 metrics.log_test_batch(
@@ -68,8 +68,8 @@ def _set_seed():
     random.seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
-
 def run(params):
+
     _set_seed()
     metrics = MetricsLogger(skip_wandb=params['skip_wandb'])
 
@@ -85,7 +85,8 @@ def run(params):
         hidden_size=params['hidden_size'], 
         freeze=params['freeze'], 
         max_seq_len=params['max_seq_len'], 
-        device=DEVICE
+        device=DEVICE,
+        top_k=params['top_k']
     )
     metrics.log_model_params(model)
 
@@ -101,7 +102,8 @@ runs = [
         "data_mode": "full",
         "model_name": "big-head",
         "skip_wandb": False,
-        "max_seq_len": 128
+        "max_seq_len": 512,
+        "top_k": 128
     }
 ]
 
