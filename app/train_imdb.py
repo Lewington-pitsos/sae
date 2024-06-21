@@ -1,3 +1,4 @@
+import os
 import random
 import numpy as np
 import torch
@@ -72,6 +73,7 @@ def _set_seed():
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 def run(params):
+    os.environ['HF_TOKEN'] = CREDS['HF_TOKEN']
 
     _set_seed()
     metrics = MetricsLogger(model_name=params['model_name'], skip_wandb=params['skip_wandb'])
