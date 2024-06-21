@@ -12,12 +12,12 @@ from app.data import load_imdb
 from app.logging import MetricsLogger
 
 def train(metrics: MetricsLogger, model, train_dataset, test_dataset, lr, epochs, batch_size, device=DEVICE):
-    train_loader = DataLoader(train_dataset, batch_size=batch_size)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.9)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.7)
 
     model.to(device)
 
@@ -59,6 +59,9 @@ def train(metrics: MetricsLogger, model, train_dataset, test_dataset, lr, epochs
         scheduler.step()
         metrics.step_epoch()
 
+
+
+
     metrics.finalize()
 
 def _set_seed():
@@ -92,20 +95,22 @@ def run(params):
 
     train(metrics, model, train_dataset, test_dataset, batch_size=params['batch_size'], epochs=params['epochs'], lr=params['lr'], device=DEVICE)
 
-runs = [
-    {
+base_params = {
         "batch_size": 256,
         "hidden_size": 768,
-        "lr": 1e-5,
+        "lr": 1e-4,
         "epochs": 5,
         "freeze": True,
         "data_mode": "full",
-        "model_name": "big-head",
+        "model_name": "sae-classifier",
         "skip_wandb": False,
-        "max_seq_len": 512,
-        "top_k": 128
-    }
-]
+        "max_seq_len": 256,
+        "top_k": None
+}
+
+a = base_params.copy()
+
+runs = [a]
 
 for r in runs:
     print("Starting new run...")

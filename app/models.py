@@ -4,6 +4,7 @@ from transformers import GPT2Model, GPT2ForSequenceClassification, GPT2Tokenizer
 from sae_lens import SAE
 from transformer_lens import HookedTransformer
 
+from app.constants import *
 
 class SimpleGPT2SequenceClassifier(nn.Module):
     def __init__(self, hidden_size: int, max_seq_len: int, gpt_model_name: str, num_classes: int = 2, freeze=False):
@@ -19,8 +20,6 @@ class SimpleGPT2SequenceClassifier(nn.Module):
         batch_size = gpt_out.shape[0]
         linear_output = self.fc1(gpt_out.view(batch_size, -1))
         return linear_output
-
-
 
 # def classify_sentiment(model, batch):
 #     with torch.no_grad():
@@ -57,9 +56,6 @@ class RandomClassifier(torch.nn.Module):
         one_hot_tensor[torch.arange(batch_size), random_predictions[0]] = 1
 
         x = self.fc1(one_hot_tensor)
-
-
-
         return x
 
 def save_tensor_activations(tensor, file_prefix='activation'):
@@ -92,7 +88,6 @@ class BigHeadGPT2SequenceClassifier(nn.Module):
             gpt_model_name: str, 
             num_classes: int = 2, 
             freeze=False, 
-            mask_hidden_state=True,
             top_k=128,
         ):
         super(BigHeadGPT2SequenceClassifier, self).__init__()
@@ -104,14 +99,21 @@ class BigHeadGPT2SequenceClassifier(nn.Module):
         self.fc1 = nn.Linear(hidden_size, head_hidden_size)
         self.activation = nn.ReLU()
         self.fc2 = nn.Linear(head_hidden_size * top_k, num_classes, bias=False)
-        self.mask_hidden_state = mask_hidden_state
         self.top_k = top_k
+
+        if top_k != None:
+            self.top_k_fn = self._top_k
+        else:
+            self.top_k_fn = lambda x, y: x # no-op
+
+    def _top_k(self, gpt_out, attention_mask):
+        gpt_out = gpt_out * attention_mask.unsqueeze(-1).clip(1e-4, 1) 
+        gpt_out = order_invariant_topk(gpt_out, self.top_k, 1)
+        return gpt_out
 
     def forward(self, input_ids, attention_mask):
         gpt_out = self.gpt2model(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
-        if self.mask_hidden_state:
-            gpt_out = gpt_out * attention_mask.unsqueeze(-1).clip(1e-4, 1) 
-            gpt_out = order_invariant_topk(gpt_out, self.top_k, 1)
+        gpt_out = self.top_k_fn(gpt_out, attention_mask)
 
         x = self.fc1(gpt_out)
         x = self.activation(x)
@@ -137,7 +139,14 @@ class ActivationModel(nn.Module):
         return cache[self.hook_name]
 
 class SAEClassifier(nn.Module):
-    def __init__(self, gpt_model_name: str, hook_name: str, hook_layer: str, device, max_seq_len:int, num_classes: int = 2):
+    def __init__(self, 
+                 gpt_model_name: str, 
+                 hook_name: str, 
+                 hook_layer: str, 
+                 device, 
+                 max_seq_len:int = None, 
+                 num_classes: int = 2,
+        ):
         super(SAEClassifier, self).__init__()
 
         sae, _, _ = SAE.from_pretrained(
@@ -151,15 +160,24 @@ class SAEClassifier(nn.Module):
         for param in self.sae.parameters():
             param.requires_grad = False
 
-        self.fc1 = nn.Linear(sae.cfg.d_sae * max_seq_len, num_classes)
+        seq_len = int(max_seq_len / 8)
+
+        print(' number of features', seq_len)
+
+        self.fc1 = nn.Linear(sae.cfg.d_sae * seq_len, num_classes, bias=False)
         self.device = device
 
-        self.model = HookedTransformer.from_pretrained(gpt_model_name, device=device)
+        self.model = HookedTransformer.from_pretrained(gpt_model_name, device=device, use_auth_token=CREDS['HF_TOKEN'])
         self.hook_layer = hook_layer
         self.hook_name = hook_name
 
         for param in self.model.parameters():
             param.requires_grad = False
+
+
+        self.dropout = nn.Dropout(0.3)
+        self.avg_pool = nn.AvgPool1d(kernel_size=8, stride=8)
+
 
     def forward(self, input_ids, attention_mask):
         _, cache = self.model.run_with_cache(input_ids, attention_mask=attention_mask, prepend_bos=True, stop_at_layer=self.hook_layer + 1)
@@ -168,7 +186,14 @@ class SAEClassifier(nn.Module):
 
         features = self.sae.encode(activations)
 
+        features = features.transpose(1, 2)
+
+        features = self.avg_pool(features)
+
+        features = features.transpose(1, 2)
+
         features = features.view(features.shape[0], -1)
+        features = self.dropout(features)
 
         x = self.fc1(features)
         return x

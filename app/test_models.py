@@ -65,5 +65,3 @@ def test_official_classifier():
     print(predictions)
 
     assert predictions.shape == (2, 2)
-
-# test_classification_attention()

@@ -3,7 +3,7 @@ data/*
 !data/.gitignore
 cruft/*
 !cruft/.gitignore
-
+.credentials.json
 **/__pycache__
 
 wandb
