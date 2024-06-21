@@ -101,7 +101,7 @@ runs = [
         "data_mode": "full",
         "model_name": "big-head",
         "skip_wandb": False,
-        "max_seq_len": 512
+        "max_seq_len": 128
     }
 ]
 
