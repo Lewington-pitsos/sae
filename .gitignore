@@ -7,3 +7,4 @@ cruft/*
 **/__pycache__
 
 wandb
+.params.json

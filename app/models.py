@@ -74,13 +74,6 @@ def save_tensor_activations(tensor, file_prefix='activation'):
         plt.savefig(f'{file_prefix}_{i+1}.png')
         plt.close()
 
-
-def order_invariant_topk(input_tensor, k, input_dim):
-    _, indices = torch.topk(torch.abs(input_tensor), k, dim=input_dim, sorted=False)
-
-    sorted_indices = torch.sort(indices, dim=input_dim)[0]
-    return torch.gather(input_tensor, dim=input_dim, index=sorted_indices)
-
 class BigHeadGPT2SequenceClassifier(nn.Module):
     def __init__(self, 
             hidden_size: int, 
@@ -88,7 +81,6 @@ class BigHeadGPT2SequenceClassifier(nn.Module):
             gpt_model_name: str, 
             num_classes: int = 2, 
             freeze=False, 
-            top_k=128,
         ):
         super(BigHeadGPT2SequenceClassifier, self).__init__()
         self.gpt2model = GPT2Model.from_pretrained(gpt_model_name)
@@ -98,22 +90,10 @@ class BigHeadGPT2SequenceClassifier(nn.Module):
         head_hidden_size = 8192
         self.fc1 = nn.Linear(hidden_size, head_hidden_size)
         self.activation = nn.ReLU()
-        self.fc2 = nn.Linear(head_hidden_size * top_k, num_classes, bias=False)
-        self.top_k = top_k
-
-        if top_k != None:
-            self.top_k_fn = self._top_k
-        else:
-            self.top_k_fn = lambda x, y: x # no-op
-
-    def _top_k(self, gpt_out, attention_mask):
-        gpt_out = gpt_out * attention_mask.unsqueeze(-1).clip(1e-4, 1) 
-        gpt_out = order_invariant_topk(gpt_out, self.top_k, 1)
-        return gpt_out
+        self.fc2 = nn.Linear(head_hidden_size * max_seq_len, num_classes, bias=False)
 
     def forward(self, input_ids, attention_mask):
         gpt_out = self.gpt2model(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
-        gpt_out = self.top_k_fn(gpt_out, attention_mask)
 
         x = self.fc1(gpt_out)
         x = self.activation(x)
@@ -213,11 +193,11 @@ class GPT2Classifier(nn.Module):
     def forward(self, input_ids, attention_mask):
         return self.model(input_ids=input_ids, attention_mask=attention_mask).logits
 
-def build_model(model_name, hidden_size, max_seq_len, gpt_model_name, freeze, top_k, device):
+def build_model(model_name, hidden_size, max_seq_len, gpt_model_name, freeze, device):
     if model_name == 'simple':
         return SimpleGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=max_seq_len, gpt_model_name=gpt_model_name, freeze=freeze)
     elif model_name == 'big-head':
-        return BigHeadGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=max_seq_len, gpt_model_name=gpt_model_name, freeze=freeze, top_k=top_k)
+        return BigHeadGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=max_seq_len, gpt_model_name=gpt_model_name, freeze=freeze)
     elif model_name == 'sae-classifier-gpt2':
         return SAEClassifier(transformer_name=gpt_model_name, sae_release="gpt2-small-res-jb", sae_id="blocks.8.hook_resid_pre", device=device, max_seq_len=max_seq_len)
     elif model_name == 'sae-classifier-mistral7b':

@@ -89,27 +89,13 @@ def run(params):
         freeze=params['freeze'], 
         max_seq_len=params['max_seq_len'], 
         device=DEVICE,
-        top_k=params['top_k']
     )
     metrics.log_model_params(model)
 
     train(metrics, model, train_dataset, test_dataset, batch_size=params['batch_size'], epochs=params['epochs'], lr=params['lr'], device=DEVICE)
 
-base_params = {
-        "batch_size": 16,
-        "hidden_size": 768,
-        "lr": 1e-5,
-        "epochs": 5,
-        "freeze": True,
-        "data_mode": "full",
-        "model_name": "sae-classifier-mistral7b",
-        "skip_wandb": False,
-        "max_seq_len": 256,
-}
-
-a = base_params.copy()
-
-runs = [a]
+with open('.params.json') as f:
+    runs = json.load(f)
 
 for r in runs:
     print("Starting new run...")
