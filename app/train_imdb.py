@@ -11,12 +11,12 @@ from app.constants import *
 from app.data import load_imdb
 from app.logging import MetricsLogger
 
-def train(metrics: MetricsLogger, model, train_dataset, test_dataset, learning_rate, epochs, batch_size, device=DEVICE):
+def train(metrics: MetricsLogger, model, train_dataset, test_dataset, lr, epochs, batch_size, device=DEVICE):
     train_loader = DataLoader(train_dataset, batch_size=batch_size)
     test_loader = DataLoader(test_dataset, batch_size=batch_size)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.9)
 
     model.to(device)
@@ -61,41 +61,50 @@ def train(metrics: MetricsLogger, model, train_dataset, test_dataset, learning_r
 
     metrics.finalize()
 
-seed = 42
-torch.manual_seed(seed)
-np.random.seed(seed)
-random.seed(seed)
-if torch.cuda.is_available():
-    torch.cuda.manual_seed_all(seed)
+def _set_seed():
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
-BATCH_SIZE = 256
-hidden_size = 768
-learning_rate = 1e-5
-epochs=5
-freeze = True
-data_mode='full'
-model_name = 'random'
-skip_wandb = False
+def run(params):
+    _set_seed()
+    metrics = MetricsLogger(skip_wandb=params['skip_wandb'])
 
-metrics = MetricsLogger(skip_wandb=skip_wandb)
+    metrics.init(project="imdb-gpt2-classification", config=params.copy())
 
-metrics.init(project="imdb-gpt2-classification", config={
-    "batch_size": BATCH_SIZE,
-    "learning_rate": learning_rate,
-    "num_epochs": epochs,
-    "max_seq_len": MAX_SEQ_LEN,
-    "hidden_size": hidden_size,
-    "freeze": freeze,
-    "data_mode": data_mode,
-    "model_name": model_name
-})
+    train_dataset, test_dataset = load_imdb(data_mode=params['data_mode'], max_seq_len=params['max_seq_len'])
+    metrics.log_label_ratio(train_dataset, 'train')
+    metrics.log_label_ratio(test_dataset, 'test')
 
+    model = build_model(
+        params['model_name'], 
+        gpt_model_name='gpt2', 
+        hidden_size=params['hidden_size'], 
+        freeze=params['freeze'], 
+        max_seq_len=params['max_seq_len'], 
+        device=DEVICE
+    )
+    metrics.log_model_params(model)
 
-train_dataset, test_dataset = load_imdb(data_mode=data_mode)
-metrics.log_label_ratio(train_dataset, 'train')
-metrics.log_label_ratio(test_dataset, 'test')
+    train(metrics, model, train_dataset, test_dataset, batch_size=params['batch_size'], epochs=params['epochs'], lr=params['lr'], device=DEVICE)
 
-model = build_model(model_name, gpt_model_name='gpt2', hidden_size=hidden_size, freeze=freeze, max_seq_len=MAX_SEQ_LEN, device=DEVICE)
-metrics.log_model_params(model)
+runs = [
+    {
+        "batch_size": 256,
+        "hidden_size": 768,
+        "lr": 1e-5,
+        "epochs": 5,
+        "freeze": True,
+        "data_mode": "full",
+        "model_name": "big-head",
+        "skip_wandb": False,
+        "max_seq_len": 512
+    }
+]
 
-train(metrics, model, train_dataset, test_dataset, batch_size=BATCH_SIZE, epochs=epochs, learning_rate=learning_rate, device=DEVICE)
+for r in runs:
+    print("Starting new run...")
+    run(r)

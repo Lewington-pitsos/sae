@@ -28,7 +28,7 @@ class IMDBDataset(Dataset):
         return input_ids, attention_mask, label
 
 
-def _build_dataset(data_mode):
+def _build_dataset(data_mode, max_seq_len):
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
     tokenizer.pad_token = tokenizer.eos_token 
     dataset = load_dataset('imdb')
@@ -47,25 +47,25 @@ def _build_dataset(data_mode):
     del dataset['unsupervised'] 
 
     def tokenize_function(examples):
-        return tokenizer(examples['text'], padding='max_length', truncation=True, max_length=MAX_SEQ_LEN)
+        return tokenizer(examples['text'], padding='max_length', truncation=True, max_length=max_seq_len)
 
     dataset = dataset.map(tokenize_function, batched=True)
 
     return dataset
 
-def load_imdb(data_mode) -> IMDBDataset:
+def load_imdb(data_mode, max_seq_len) -> IMDBDataset:
     if data_mode not in ['one-batch', 'dry-run', 'full']:
         raise ValueError(f"Invalid setting: {data_mode}")
     ds_name = data_mode
     
-    local_file = os.path.join('cruft', 'datasets', f'imdb-{ds_name}.pt')
+    local_file = os.path.join('cruft', 'datasets', f'imdb-{ds_name}-{max_seq_len}.pt')
 
     if os.path.exists(local_file):
         print(f"Loading dataset from {local_file}")
         dataset = torch.load(local_file)
     else:
         print("Building dataset...")
-        dataset = _build_dataset(data_mode)
+        dataset = _build_dataset(data_mode, max_seq_len)
 
         os.makedirs(os.path.dirname(local_file), exist_ok=True)
         torch.save(dataset, local_file)
