@@ -102,23 +102,8 @@ class BigHeadGPT2SequenceClassifier(nn.Module):
 
         return x
 
-class ActivationModel(nn.Module):
-    def __init__(self, gpt_model_name: str, hook_name: str, hook_layer: str, device):
-        super(ActivationModel, self).__init__()
-        
-        self.model = HookedTransformer.from_pretrained(gpt_model_name, device=device)
-        self.hook_layer = hook_layer
-        self.hook_name = hook_name
 
-        for param in self.model.parameters():
-            param.requires_grad = False
-
-    def forward(self, input_ids, attention_mask):
-        _, cache = self.model.run_with_cache(input_ids, attention_mask=attention_mask, prepend_bos=True, stop_at_layer=self.hook_layer + 1)
-
-        return cache[self.hook_name]
-
-class SAEClassifier(nn.Module):
+class SAEBaseModel(nn.Module):
     def __init__(self, 
                  transformer_name: str, 
                  sae_release: str,
@@ -127,11 +112,9 @@ class SAEClassifier(nn.Module):
                  max_seq_len:int = None, 
                  num_classes: int = 2,
         ):
-        super(SAEClassifier, self).__init__()
+        super(SAEBaseModel, self).__init__()
 
         sae, _, _ = SAE.from_pretrained(release = sae_release, sae_id = sae_id, device = device)
-
-        print(sae.cfg)
 
         self.sae = sae
 
@@ -139,8 +122,6 @@ class SAEClassifier(nn.Module):
             param.requires_grad = False
 
         seq_len = int(max_seq_len / 8)
-
-        print(' number of features', seq_len)
 
         self.fc1 = nn.Linear(sae.cfg.d_sae * seq_len, num_classes, bias=False)
         self.device = device
@@ -157,6 +138,16 @@ class SAEClassifier(nn.Module):
         self.avg_pool = nn.AvgPool1d(kernel_size=8, stride=8)
 
 
+class SAEFeaturesModel(SAEBaseModel):
+    def forward(self, input_ids, attention_mask):
+        _, cache = self.model.run_with_cache(input_ids, attention_mask=attention_mask, prepend_bos=True, stop_at_layer=self.hook_layer + 1)
+
+        hidden_states = cache[self.hook_name]
+
+        features = self.sae.encode(hidden_states)
+        return features
+
+class SAEClassifier(SAEBaseModel):
     def forward(self, input_ids, attention_mask):
         _, cache = self.model.run_with_cache(input_ids, attention_mask=attention_mask, prepend_bos=True, stop_at_layer=self.hook_layer + 1)
 
@@ -193,18 +184,47 @@ class GPT2Classifier(nn.Module):
     def forward(self, input_ids, attention_mask):
         return self.model(input_ids=input_ids, attention_mask=attention_mask).logits
 
-def build_model(model_name, hidden_size, max_seq_len, gpt_model_name, freeze, device):
-    if model_name == 'simple':
-        return SimpleGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=max_seq_len, gpt_model_name=gpt_model_name, freeze=freeze)
-    elif model_name == 'big-head':
-        return BigHeadGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=max_seq_len, gpt_model_name=gpt_model_name, freeze=freeze)
-    elif model_name == 'sae-classifier-gpt2':
-        return SAEClassifier(transformer_name=gpt_model_name, sae_release="gpt2-small-res-jb", sae_id="blocks.8.hook_resid_pre", device=device, max_seq_len=max_seq_len)
+def get_sae_model_config(model_name):
+    if model_name == 'sae-classifier-gpt2':
+        return {
+            'transformer_name': 'gpt2',
+            'sae_release': 'gpt2-small-res-jb',
+            'sae_id': 'blocks.8.hook_resid_pre',
+        }
     elif model_name == 'sae-classifier-mistral7b':
-        return SAEClassifier(transformer_name="mistralai/Mistral-7B-v0.1", sae_release="mistral-7b-res-wg", sae_id="blocks.8.hook_resid_pre", device=device, max_seq_len=max_seq_len)
+        return {
+            'transformer_name': 'mistralai/Mistral-7B-v0.1',
+            'sae_release': 'mistral-7b-res-wg',
+            'sae_id': 'blocks.8.hook_resid_pre',
+        }
+    
+    raise ValueError(f"Invalid model name: {model_name}")
+
+def build_model(model_name, hidden_size, max_seq_len, freeze, device):
+    if model_name == 'simple':
+        return SimpleGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=max_seq_len, gpt_model_name='gpt2', freeze=freeze)
+    elif model_name == 'big-head':
+        return BigHeadGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=max_seq_len, gpt_model_name='gpt2', freeze=freeze)
+    elif model_name == 'sae-classifier-gpt2':
+        return SAEClassifier(device=device, max_seq_len=max_seq_len, **get_sae_model_config(model_name))
+    elif model_name == 'sae-classifier-mistral7b':
+        return SAEClassifier(device=device, max_seq_len=max_seq_len, **get_sae_model_config(model_name))
     elif model_name == 'random':
         return RandomClassifier()
     elif model_name == 'gpt2-classifier': 
-        return GPT2Classifier(gpt_model_name).to(device)
+        return GPT2Classifier('gpt2').to(device)
         
     raise ValueError(f"Invalid model name: {model_name}")
+
+
+def masked_avg(embedding_matrix, attention_mask):
+    attention_mask_expanded = attention_mask.unsqueeze(-1)
+    
+    sum_embedding = (embedding_matrix * attention_mask_expanded).sum(dim=1)
+    non_masked_count = attention_mask.sum(dim=1, keepdim=True)
+    
+    non_masked_count = non_masked_count.clamp(min=1)
+    
+    average_embedding = sum_embedding / non_masked_count
+
+    return average_embedding

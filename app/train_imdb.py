@@ -73,6 +73,9 @@ def _set_seed():
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 def run(params):
+    if ('skip_training' in params and params['skip_training']) and not params['skip_wandb']:
+        raise ValueError("If you want to skip training, you should also skip wandb logging")
+    
     os.environ['HF_TOKEN'] = CREDS['HF_TOKEN']
 
     _set_seed()
@@ -80,19 +83,22 @@ def run(params):
 
     metrics.init(project="imdb-gpt2-classification", config=params.copy())
 
-    train_dataset, test_dataset = load_imdb(data_mode=params['data_mode'], max_seq_len=params['max_seq_len'], model_name=params['model_name'])
+    train_dataset, test_dataset = load_imdb(data_mode=params['data_mode'], max_seq_len=params['max_seq_len'], model_name=params['model_name'], embedding_params=params['embedding_params'])
     metrics.log_label_ratio(train_dataset, 'train')
     metrics.log_label_ratio(test_dataset, 'test')
 
     model = build_model(
         params['model_name'], 
-        gpt_model_name='gpt2', 
         hidden_size=params['hidden_size'], 
         freeze=params['freeze'], 
         max_seq_len=params['max_seq_len'], 
         device=DEVICE,
     )
     metrics.log_model_params(model)
+
+    if 'skip_training' in params and params['skip_training']:
+        metrics.finalize()
+        return
 
     train(metrics, model, train_dataset, test_dataset, batch_size=params['batch_size'], epochs=params['epochs'], lr=params['lr'], device=DEVICE)
 
