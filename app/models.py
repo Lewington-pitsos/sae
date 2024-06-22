@@ -145,7 +145,7 @@ class SAEClassifier(nn.Module):
         self.fc1 = nn.Linear(sae.cfg.d_sae * seq_len, num_classes, bias=False)
         self.device = device
 
-        self.model = HookedTransformer.from_pretrained(transformer_name, device=device, use_auth_token=CREDS['HF_TOKEN'])
+        self.model = HookedTransformer.from_pretrained(transformer_name, device=device)
         self.hook_layer = sae.cfg.hook_layer
         self.hook_name = sae.cfg.hook_name
 
