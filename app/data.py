@@ -57,8 +57,8 @@ def _build_dataset(data_mode, max_seq_len, model_name, embedding_params):
         )
 
         def embed(examples):
-            input_ids = torch.tensor(examples['input_ids'])
-            attention_mask = torch.tensor(examples['attention_mask'])
+            input_ids = torch.tensor(examples['input_ids']).to(DEVICE)
+            attention_mask = torch.tensor(examples['attention_mask']).to(DEVICE)
             return {"avg_features": masked_avg(embedder(input_ids=input_ids, attention_mask=attention_mask), attention_mask)}
 
         dataset = dataset.map(embed, batched=True, batch_size=128)

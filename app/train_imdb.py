@@ -60,9 +60,6 @@ def train(metrics: MetricsLogger, model, train_dataset, test_dataset, lr, epochs
         scheduler.step()
         metrics.step_epoch()
 
-
-
-
     metrics.finalize()
 
 def _set_seed():
