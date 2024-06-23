@@ -1,8 +1,23 @@
 import torch
 import xgboost as xgb
 import numpy as np
+import wandb
 
 from app.constants import *
+
+
+class LogEvaluation(xgb.callback.TrainingCallback):
+    def __init__(self, period=1):
+        self.period = period
+
+    def after_iteration(self, model, epoch, evals_log):
+        if epoch % self.period == 0:
+            result = {}
+            for data_name, data in evals_log.items():
+                for metric_name, score in data.items():
+                    result[f'{data_name}-{metric_name}'] = score[-1]
+            wandb.log(result)
+        return False
 
 def load_sae_feature_dataset():    
     train = torch.load(f'{LOCAL_DATA_PATH}/avg-emb-gpt2-256-train.pt')
@@ -32,8 +47,10 @@ def accuracy(preds, ds):
     preds = preds > 0.5
 
     accuracy = np.sum(preds == labels) / len(labels)
-    return 'accuracy', accuracy
+    return accuracy
 
+def accuracy_metric(preds, ds):
+    return 'accuracy', accuracy(preds, ds)
 
 def train():
     config_defaults = {
@@ -55,9 +72,12 @@ def train():
     # Create watchlist
     watchlist = [(dtrain, 'train'), (dval, 'val'), (dholdout, 'holdout')]
 
+    wandb.init(config=config_defaults, project="xgb-test")  # defaults are over-ridden during the sweep
+
     # Train the model with evaluation on the training and test sets, and early stopping
-    bst = xgb.train(config_defaults, dtrain, config_defaults['num_round'], watchlist, custom_metric=accuracy, early_stopping_rounds=50, maximize=True)
+    bst = xgb.train(config_defaults, dtrain, config_defaults['num_round'], watchlist, custom_metric=accuracy_metric, early_stopping_rounds=50, maximize=True, callbacks=[LogEvaluation(1)])
 
 
+    wandb.finish()
 if __name__ == '__main__':  
     train()
