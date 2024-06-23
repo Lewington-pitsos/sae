@@ -50,4 +50,4 @@ def destroy_all_pods():
 
     for pod in pods:
         print(f"Deleting pod: {pod['id']}")
-        runpod.delete_pod(pod['id'])
+        runpod.terminate_pod(pod['id'])
