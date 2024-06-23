@@ -1,5 +1,6 @@
 import torch
 import json
+import os
 
 SAE_EMBEDDING_LAYER_NUMBER=8
 MAX_GPT2_BATCH_SIZE=256
@@ -15,7 +16,11 @@ DATASETS = {
 }
 
 
-with open('.credentials.json') as f:
-    CREDS = json.load(f)
-
+CREDENTIALS_FILE = '.credentials.json'
+if os.path.exists(CREDENTIALS_FILE):
+    with open(CREDENTIALS_FILE) as f:
+        CRED = json.load(f)
+else:
+    env = os.environ
+    CRED = { **env }
 

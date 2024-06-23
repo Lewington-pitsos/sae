@@ -73,7 +73,7 @@ def run(params):
     if ('skip_training' in params and params['skip_training']) and not params['skip_wandb']:
         raise ValueError("If you want to skip training, you should also skip wandb logging")
     
-    os.environ['HF_TOKEN'] = CREDS['HF_TOKEN']
+    os.environ['HF_TOKEN'] = CRED['HF_TOKEN']
 
     _set_seed()
     metrics = MetricsLogger(model_name=params['model_name'], skip_wandb=params['skip_wandb'])

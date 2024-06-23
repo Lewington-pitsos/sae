@@ -8,8 +8,8 @@ class S3Store:
         self.bucket_name = 'sae-classification'
         self.local_dir = local_dir
         self.s3 = boto3.client('s3', 
-                               aws_access_key_id=CREDS["AWS_ACCESS_KEY"], 
-                               aws_secret_access_key=CREDS["AWS_SECRET_KEY"])
+                               aws_access_key_id=CRED["AWS_ACCESS_KEY"], 
+                               aws_secret_access_key=CRED["AWS_SECRET_KEY"])
         self.create_bucket_if_not_exists()
 
     def download(self, file_path):

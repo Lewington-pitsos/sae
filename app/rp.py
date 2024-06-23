@@ -5,9 +5,9 @@ from app.constants import *
 
 
 def create_pod(gpu_type_id="NVIDIA A100 80GB PCIe"):
-    runpod.api_key = CREDS['RUNPOD_API_KEY']
+    runpod.api_key = CRED['RUNPOD_API_KEY']
 
-    env = {**CREDS}
+    env = {**CRED}
 
     pod = runpod.create_pod(
         cloud_type="SECURE", # or else someone might snoop your session and steal your AWS/CDS credentials
@@ -21,7 +21,7 @@ def create_pod(gpu_type_id="NVIDIA A100 80GB PCIe"):
     print(f"Pod created: {pod}")
 
 def show_pods():
-    runpod.api_key = CREDS['RUNPOD_API_KEY']
+    runpod.api_key = CRED['RUNPOD_API_KEY']
 
     pods = runpod.get_pods()
 
@@ -30,7 +30,7 @@ def show_pods():
         print(pod)
 
 def destroy_all_pods():
-    runpod.api_key = CREDS['RUNPOD_API_KEY']
+    runpod.api_key = CRED['RUNPOD_API_KEY']
 
     pods = runpod.get_pods()
 
