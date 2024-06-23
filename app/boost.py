@@ -19,9 +19,9 @@ class LogEvaluation(xgb.callback.TrainingCallback):
             wandb.log(result)
         return False
 
-def load_sae_feature_dataset():    
-    train = torch.load(f'{LOCAL_DATA_PATH}/avg-emb-gpt2-256-train.pt')
-    test = torch.load(f'{LOCAL_DATA_PATH}/avg-emb-gpt2-256-test.pt')
+def load_sae_feature_dataset(train_filename=f'{LOCAL_DATA_PATH}/avg-emb-gpt2-256-train.pt', test_filename=f'{LOCAL_DATA_PATH}/avg-emb-gpt2-256-test.pt'):    
+    train = torch.load(train_filename)
+    test = torch.load(test_filename)
 
     X = train[:, :-1].numpy()
     y = train[:, -1].numpy()
@@ -55,19 +55,20 @@ def accuracy_metric(preds, ds):
 def train():
     config_defaults = {
         'boosting': 'gbtree',  # Use tree based models
-        'max_depth': 6,  # Increase depth
-        'eta': 0.001,  # Decrease learning rate
+        'max_depth': 7,  # Increase depth
         'objective': 'binary:logistic',
         'eval_metric': ['logloss'],  # Include both logloss and error
         'subsample': 0.8,  # Subsample ratio of the training instances
         'colsample_bytree': 0.8,  # Subsample ratio of columns when constructing each tree
         'alpha': 0.1,  # L1 regularization term
         'device': 'cuda',
-        "learning_rate": 0.1,
-        'num_round': 2500,
+        'learning_rate': 0.01,
     }
     
-    dtrain, dval, dholdout = load_sae_feature_dataset()
+    dtrain, dval, dholdout = load_sae_feature_dataset(
+        f'{LOCAL_DATA_PATH}/avg-emb-gpt2-256-train-pca-64.pt',
+        f'{LOCAL_DATA_PATH}/avg-emb-gpt2-256-test-pca-64.pt'
+    )
 
     # Create watchlist
     watchlist = [(dtrain, 'train'), (dval, 'val'), (dholdout, 'holdout')]
@@ -75,7 +76,7 @@ def train():
     wandb.init(config=config_defaults, project="xgb-test")  # defaults are over-ridden during the sweep
 
     # Train the model with evaluation on the training and test sets, and early stopping
-    bst = xgb.train(config_defaults, dtrain, config_defaults['num_round'], watchlist, custom_metric=accuracy_metric, early_stopping_rounds=50, maximize=True, callbacks=[LogEvaluation(1)])
+    bst = xgb.train(config_defaults, dtrain, 10000, watchlist, custom_metric=accuracy_metric, maximize=True, callbacks=[LogEvaluation(1)])
 
 
     wandb.finish()

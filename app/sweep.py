@@ -52,20 +52,17 @@ sweep_config = {
     },
     "parameters": {
         "max_depth": {
-            "values": [2, 4, 6, 10]
-        },
-        "alpha": {
-            "values": [0.2, 0.1, 0.01]
+            "values": [3, 5, 9]
         },
         "learning_rate": {
-            "values": [0.001, 0.005, 0.05, 0.2]
+            "values": [0.05, 0.1, 0.15]
         },
         "subsample": {
-            "values": [1, 0.9, 0.8, 0.7]
+            "values": [0.9, 0.85, 0.75]
         },
     }
 }
 
 sweep_id = wandb.sweep(sweep_config, project="sae-cls-gpt-XGBoost-2")
 
-wandb.agent(sweep_id, train, count=50)
+wandb.agent(sweep_id, train, count=25)
