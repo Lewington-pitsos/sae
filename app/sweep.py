@@ -7,14 +7,15 @@ from app.boost import *
 def train():
     config_defaults = {
         'booster': 'gbtree',  # Use tree based models
-        'max_depth': 4,  # Increase depth
+        'max_depth': 5,  # Increase depth
         'objective': 'binary:logistic',
         'eval_metric': ['logloss'],  # Include both logloss and error
-        'subsample': 0.7,  # Subsample ratio of the training instances
+        'subsample': 0.85,  # Subsample ratio of the training instances
         'colsample_bytree': 0.8,  # Subsample ratio of columns when constructing each tree
-        'alpha': 0.2,  # L1 regularization term
+        'alpha': 0.1,  # L1 regularization term
         'lambda': 1.0,  # L2 regularization term
         'device': 'cuda',
+        'min_child_weight': 1.0,  # Minimum sum of instance weight needed in a child
         "learning_rate": 0.05,
     }
 
@@ -51,18 +52,15 @@ sweep_config = {
       "goal": "maximize"   
     },
     "parameters": {
-        "max_depth": {
-            "values": [3, 5, 9]
+        "min_child_weight": {
+            "values": [0.2, 0.7, 1.0, 1.5, 3], 
         },
         "learning_rate": {
-            "values": [0.05, 0.1, 0.15]
-        },
-        "subsample": {
-            "values": [0.9, 0.85, 0.75]
-        },
+            "values": [0.03, 0.7]
+        }
     }
 }
 
 sweep_id = wandb.sweep(sweep_config, project="sae-cls-gpt-XGBoost-2")
 
-wandb.agent(sweep_id, train, count=25)
+wandb.agent(sweep_id, train, count=15)

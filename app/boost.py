@@ -35,8 +35,6 @@ def load_sae_feature_dataset(train_filename=f'{LOCAL_DATA_PATH}/avg-emb-gpt2-256
     y_val = y_test[:20000]
 
     dval = xgb.DMatrix(X_val, label=y_val)
-    X_test = X_test[20000:]
-    y_test = y_test[20000:]
 
     dholdout = xgb.DMatrix(X_test, label=y_test)
 
@@ -55,19 +53,19 @@ def accuracy_metric(preds, ds):
 def train():
     config_defaults = {
         'boosting': 'gbtree',  # Use tree based models
-        'max_depth': 7,  # Increase depth
+        'max_depth': 5,  # Increase depth
         'objective': 'binary:logistic',
         'eval_metric': ['logloss'],  # Include both logloss and error
-        'subsample': 0.8,  # Subsample ratio of the training instances
+        'subsample': 0.85,  # Subsample ratio of the training instances
         'colsample_bytree': 0.8,  # Subsample ratio of columns when constructing each tree
         'alpha': 0.1,  # L1 regularization term
         'device': 'cuda',
-        'learning_rate': 0.01,
+        'learning_rate': 0.05,
     }
     
     dtrain, dval, dholdout = load_sae_feature_dataset(
-        f'{LOCAL_DATA_PATH}/avg-emb-mistral-256-train.pt',
-        f'{LOCAL_DATA_PATH}/avg-emb-mistral-256-train.pt'
+        f'{LOCAL_DATA_PATH}/avg-emb-gpt2-mistral-train.pt',
+        f'{LOCAL_DATA_PATH}/avg-emb-gpt2-mistral-test.pt'
     )
 
     # Create watchlist
