@@ -39,8 +39,6 @@ def show_pods():
     IdentitiesOnly yes
 """)
 
-
-
 def destroy_all_pods():
     runpod.api_key = CRED['RUNPOD_API_KEY']
 

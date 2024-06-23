@@ -43,7 +43,7 @@ def handle_runpod(args):
     if args.action == 'deploy':
         deploy_pod()
     elif args.action == 'purge':
-        print('ʕノ•ᴥ•ʔノ\npurging all pods...\n')
+        print('purging all pods...\n')
         destroy_all_pods()
     elif args.action == 'show':
         show_pods()
