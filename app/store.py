@@ -55,6 +55,34 @@ class S3Store:
             else:
                 print(f"Error checking if bucket exists: {e}")
 
+    # make it so that the remote matches the local by deleting remote files that don't exist locally
+    # and uploading local files that don't exist remotely
+    def sync_remote(self):
+        for root, dirs, files in os.walk(self.local_dir):
+            for file in files:
+                local_file_path = os.path.join(root, file)
+                remote_file_path = os.path.relpath(local_file_path, self.local_dir)
+
+                if not remote_file_path.startswith('.'):
+                    try:
+                        self.s3.head_object(Bucket=self.bucket_name, Key=remote_file_path)
+                        print(file, '<----- already exists remotely')
+                    except self.s3.exceptions.ClientError as e:
+                        if e.response['Error']['Code'] == '404':
+                            self.upload(local_file_path)
+                            print(file, '<----- uploaded')
+
+        paginator = self.s3.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=self.bucket_name):
+            for obj in page.get('Contents', []):
+                remote_file_path = obj['Key']
+
+                if not remote_file_path.startswith('.'):
+                    local_file_path = os.path.join(self.local_dir, remote_file_path)
+                    if not os.path.exists(local_file_path):
+                        # delete remote file 
+                        self.s3.delete_object(Bucket=self.bucket_name, Key=remote_file_path)
+                        print(remote_file_path, '<----- deleted from remote')
 
     def sync(self):
         for root, dirs, files in os.walk(self.local_dir):

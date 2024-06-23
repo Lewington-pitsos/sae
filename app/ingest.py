@@ -1,6 +1,8 @@
 import torch
 from tqdm import tqdm
 from datasets import load_dataset, get_dataset_config_names
+from datasets import Dataset, DatasetDict, Features, ClassLabel, Value
+
 
 from app.constants import *
 
@@ -40,15 +42,43 @@ def ingest_ade_raft():
 
     label_remapping = {2: 0, 1: 1}
 
-    for split in ['train', 'test']:
-        for example in tqdm(raft_subset[split]):
-            example['text'] = example['Sentence']
-            example['label'] = label_remapping[example['label']]
 
-            del example['Sentence']
-            del example['ID']
-            del example['Label']
+    def reformat(example):
+        example['text'] = example['Sentence']
+        example['label'] = label_remapping[example['label']]
 
-    dataset_dict = {'train': list(raft_subset['train']), 'test': list(raft_subset['test'])}     
+        del example['Sentence']
+        del example['ID']
+        del example['Label']
 
-    torch.save(dataset_dict, F'{LOCAL_DATA_PATH}/ade_raft_labelled.pt') 
+        return example
+    
+    raft_subset = raft_subset.map(reformat)
+
+    # Assuming each item in raft_subset['train'] and raft_subset['test'] has 'data' and 'label'
+    train_dataset = Dataset.from_dict({'text': [item['text'] for item in raft_subset['train']],
+                                    'label': [item['label'] for item in raft_subset['train']]})
+    test_dataset = Dataset.from_dict({'text': [item['text'] for item in raft_subset['test']],
+                                    'label': [item['label'] for item in raft_subset['test']]})
+
+
+    # Optionally specify features if your dataset needs specific types
+    # For example, if your dataset has a label field which is a class label
+    features = Features({
+        'text': Value('string'),  # Adjust this according to the actual data type
+        'label': ClassLabel(names=['negative', 'positive'])
+    })
+
+    train_dataset = train_dataset.cast(features)
+    test_dataset = test_dataset.cast(features)
+
+    # Combine into a DatasetDict
+    dataset_dict = DatasetDict({
+        'train': train_dataset,
+        'test': test_dataset
+    })
+
+    # Save to disk
+    dataset_dict.save_to_disk(F'{LOCAL_DATA_PATH}/ade_raft_labelled')
+
+ingest_ade_raft()
