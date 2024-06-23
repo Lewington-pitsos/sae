@@ -1,9 +1,10 @@
-from app.models import SAEFeaturesModel, get_sae_model_config, masked_avg
+import tqdm
 import torch
 from torch.utils.data import DataLoader
-import tqdm
 
-DEVICE = 'cuda'
+from app.models import SAEFeaturesModel, get_sae_model_config, masked_avg
+from app.constants import *
+
 max_seq_len = 256
 model_name = 'sae-classifier-gpt2'
 
@@ -13,10 +14,8 @@ embedder = SAEFeaturesModel(
     **get_sae_model_config(model_name)
 )
 
-local_file = 'cruft/datasets/imdb-full-256-sae-classifier-gpt2-emb.pt'
+local_file = DATASETS['gpt2-256']['path']
 dataset = torch.load(local_file)
-
-dataset = dataset.remove_columns(['avg_features'])
 
 def embed(examples):
     input_ids = torch.stack(examples['input_ids']).to(DEVICE).transpose(1, 0)

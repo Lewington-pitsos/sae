@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from app.models import build_model
 from app.constants import *
-from app.data import load_imdb
+from app.load import load_imdb
 from app.logging import MetricsLogger
 
 def train(metrics: MetricsLogger, model, train_dataset, test_dataset, lr, epochs, batch_size, device=DEVICE):
@@ -99,9 +99,13 @@ def run(params):
 
     train(metrics, model, train_dataset, test_dataset, batch_size=params['batch_size'], epochs=params['epochs'], lr=params['lr'], device=DEVICE)
 
-with open('.params.json') as f:
-    runs = json.load(f)
+def run_all():
+    with open('.params.json') as f:
+        runs = json.load(f)
 
-for r in runs:
-    print("Starting new run...")
-    run(r)
+    for r in runs:
+        print("Starting new run...")
+        run(r)
+
+if __name__ == "__main__":
+    run_all()
