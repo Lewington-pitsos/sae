@@ -6,7 +6,7 @@ from app.models import SAEFeaturesModel, get_sae_model_config, masked_avg
 from app.constants import *
 
 max_seq_len = 256
-model_name = 'sae-classifier-gpt2'
+model_name = 'sae-classifier-mistral7b'
 
 embedder = SAEFeaturesModel(
     device=DEVICE,
@@ -14,7 +14,7 @@ embedder = SAEFeaturesModel(
     **get_sae_model_config(model_name)
 )
 
-local_file = DATASETS['gpt2-256']['path']
+local_file = DATASETS['mistral-256']['path']
 dataset = torch.load(local_file)
 
 def embed(examples):
@@ -25,7 +25,7 @@ def embed(examples):
 
 with torch.no_grad():
     for ds_name in ['train', 'test']:
-        loader = DataLoader(dataset[ds_name], batch_size=64, shuffle=True)
+        loader = DataLoader(dataset[ds_name], batch_size=16, shuffle=True)
         all_avg_fts = []
         for i, batch in tqdm.tqdm(enumerate(loader)):
             embedding = embed(batch).to('cpu')
@@ -34,4 +34,4 @@ with torch.no_grad():
 
             all_avg_fts.append(embeddings_and_labels)
         
-        torch.save(torch.cat(all_avg_fts).squeeze(), f'{LOCAL_DATA_PATH}/avg-emb-gpt2-256-{ds_name}.pt')
+        torch.save(torch.cat(all_avg_fts).squeeze(), f'{LOCAL_DATA_PATH}/avg-emb-gpt2-mistral-{ds_name}.pt')

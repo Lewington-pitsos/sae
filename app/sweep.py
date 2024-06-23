@@ -7,15 +7,15 @@ from app.boost import *
 def train():
     config_defaults = {
         'booster': 'gbtree',  # Use tree based models
-        'max_depth': 6,  # Increase depth
+        'max_depth': 4,  # Increase depth
         'objective': 'binary:logistic',
         'eval_metric': ['logloss'],  # Include both logloss and error
-        'subsample': 0.8,  # Subsample ratio of the training instances
+        'subsample': 0.7,  # Subsample ratio of the training instances
         'colsample_bytree': 0.8,  # Subsample ratio of columns when constructing each tree
-        'alpha': 0.1,  # L1 regularization term
+        'alpha': 0.2,  # L1 regularization term
         'lambda': 1.0,  # L2 regularization term
         'device': 'cuda',
-        "learning_rate": 0.1,
+        "learning_rate": 0.05,
     }
 
     wandb.init(config=config_defaults)  # defaults are over-ridden during the sweep

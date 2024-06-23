@@ -12,6 +12,10 @@ DATASETS = {
     'gpt2-256': {
         "path": f"{LOCAL_DATA_PATH}/imdb-full-256-sae-classifier-gpt2.pt",
         "description": "IMDb dataset with GPT2 embeddings of sequences of length 256 tokens",
+    },
+    'mistral-256': {
+        "path": f"{LOCAL_DATA_PATH}/imdb-full-256-sae-classifier-mistral7b.pt",
+        "description": "IMDb dataset with Mistral embeddings of sequences of length 256 tokens",
     }
 }
 

@@ -66,8 +66,8 @@ def train():
     }
     
     dtrain, dval, dholdout = load_sae_feature_dataset(
-        f'{LOCAL_DATA_PATH}/avg-emb-gpt2-256-train-pca-64.pt',
-        f'{LOCAL_DATA_PATH}/avg-emb-gpt2-256-test-pca-64.pt'
+        f'{LOCAL_DATA_PATH}/avg-emb-mistral-256-train.pt',
+        f'{LOCAL_DATA_PATH}/avg-emb-mistral-256-train.pt'
     )
 
     # Create watchlist

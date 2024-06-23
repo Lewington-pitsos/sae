@@ -69,6 +69,7 @@ def _set_seed():
     random.seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
 def run(params):
     if ('skip_training' in params and params['skip_training']) and not params['skip_wandb']:
         raise ValueError("If you want to skip training, you should also skip wandb logging")
@@ -107,6 +108,3 @@ def run_all():
     for r in runs:
         print("Starting new run...")
         run(r)
-
-if __name__ == "__main__":
-    run_all()

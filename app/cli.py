@@ -5,7 +5,7 @@ from app.train_imdb import run_all
 from app.rp import *
 
 def handle_store(args):
-    print('\n(￣个￣) store bot here sir!\n')
+    print('\n(￣个￣)\nstoremaster at your service!\n')
 
     s3_store = S3Store(local_dir=args.local_dir)
     if args.action == 'download':
@@ -27,12 +27,21 @@ def handle_store(args):
     else:
         print(f"Unknown action: {args.action}")
 
+    print('\n(￣个￣)\ntask complete!\n')
+
+
 def handle_train(args):
+    print('\n┏ʕ •ᴥ•ʔ┛\ntime to train\n')
+    
     run_all()
 
     print('\nʕノ•ᴥ•ʔノ\ntraining complete\n')
 
 def handle_runpod(args):
+
+    print("\n°˖✧◝(⁰▿⁰)◜✧˖°\nlets run those pods\n")
+
+
     if args.action == 'deploy':
         deploy_pod()
     elif args.action == 'purge':
@@ -41,7 +50,7 @@ def handle_runpod(args):
     elif args.action == 'show':
         show_pods()
 
-    print("\n°˖✧◝(⁰▿⁰)◜✧˖°")
+    print("\n°˖✧◝(⁰▿⁰)◜✧˖°\n")
 
 def main():
     parser = argparse.ArgumentParser(description='CLI for various tools.')
