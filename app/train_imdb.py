@@ -80,7 +80,7 @@ def run(params):
 
     metrics.init(project="imdb-gpt2-classification", config=params.copy())
 
-    train_dataset, test_dataset = load_imdb(data_mode=params['data_mode'], max_seq_len=params['max_seq_len'], model_name=params['model_name'], embedding_params=params['embedding_params'])
+    train_dataset, test_dataset = load_imdb(data_mode=params['data_mode'], max_seq_len=params['max_seq_len'], model_name=params['model_name'])
     metrics.log_label_ratio(train_dataset, 'train')
     metrics.log_label_ratio(test_dataset, 'test')
 
@@ -94,6 +94,7 @@ def run(params):
     metrics.log_model_params(model)
 
     if 'skip_training' in params and params['skip_training']:
+        print('skipping the actual training')
         metrics.finalize()
         return
 

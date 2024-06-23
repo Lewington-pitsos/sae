@@ -10,7 +10,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 DATASETS = {
     'gpt2-256': {
-        "path": "cruft/datasets/imdb-full-256-sae-classifier-gpt2.pt",
+        "path": "data/imdb-full-256-sae-classifier-gpt2.pt",
         "description": "IMDb dataset with GPT2 embeddings of sequences of length 256 tokens",
     }
 }
@@ -23,4 +23,3 @@ if os.path.exists(CREDENTIALS_FILE):
 else:
     env = os.environ
     CRED = { **env }
-

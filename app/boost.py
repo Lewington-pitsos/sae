@@ -2,8 +2,10 @@ import torch
 import xgboost as xgb
 import numpy as np
 
-train = torch.load('cruft/datasets/emb-train.pt')
-test = torch.load('cruft/datasets/emb-test.pt')
+from app.constants import *
+
+train = torch.load(f'{LOCAL_DATA_PATH}/emb-train.pt')
+test = torch.load(f'{LOCAL_DATA_PATH}/emb-test.pt')
 
 X = train[:, :-1].numpy()
 y = train[:, -1].numpy()

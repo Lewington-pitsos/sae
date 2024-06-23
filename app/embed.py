@@ -34,4 +34,4 @@ with torch.no_grad():
 
             all_avg_fts.append(embeddings_and_labels)
         
-        torch.save(torch.cat(all_avg_fts).squeeze(), f'cruft/datasets/emb-{ds_name}.pt')
+        torch.save(torch.cat(all_avg_fts).squeeze(), f'{LOCAL_DATA_PATH}/avg-emb-gpt2-256-{ds_name}.pt')

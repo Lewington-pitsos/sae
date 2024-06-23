@@ -3,6 +3,7 @@ import torch
 
 from transformers import GPT2Tokenizer
 
+import random
 from app.viz import log_model_parameters_info
 from app.tok import load_tokenizer
 
@@ -68,7 +69,8 @@ class MetricsLogger():
 
     def log_label_ratio(self, dataset, name):
         labels = []
-        for i in range(min(300, len(dataset))):
+        indices = random.sample(range(len(dataset)), 300)
+        for i in indices:
             labels.append(dataset.get_label(i))
         
         true_count = sum(1 for item in labels if item == 1)

@@ -26,8 +26,7 @@ class IMDBDataset(Dataset):
 
         return input_ids, attention_mask, label
 
-
-def _build_dataset(data_mode, max_seq_len, model_name, embedding_params):
+def _build_dataset(data_mode, max_seq_len, model_name):
     tokenizer = load_tokenizer(model_name)
     dataset = load_dataset('imdb')
 
@@ -49,42 +48,28 @@ def _build_dataset(data_mode, max_seq_len, model_name, embedding_params):
 
     dataset = dataset.map(tokenize_function, batched=True)
 
-    if embedding_params is not None:
-        embedder = SAEFeaturesModel(
-            device=DEVICE,
-            max_seq_len=max_seq_len,
-            **get_sae_model_config(model_name)
-        )
+    dataset_dict = {'train': list(dataset['train']), 'test': list(dataset['test'])}     
+    return dataset_dict
 
-        def embed(examples):
-            input_ids = torch.tensor(examples['input_ids']).to(DEVICE)
-            attention_mask = torch.tensor(examples['attention_mask']).to(DEVICE)
-            return {"avg_features": masked_avg(embedder(input_ids=input_ids, attention_mask=attention_mask), attention_mask)}
-
-        dataset = dataset.map(embed, batched=True, batch_size=128)
-
-    return dataset
-
-def load_imdb(data_mode, max_seq_len, model_name, embedding_params=None) -> IMDBDataset:
+def load_imdb(data_mode, max_seq_len, model_name) -> IMDBDataset:
     if data_mode not in ['one-batch', 'dry-run', 'full']:
         raise ValueError(f"Invalid setting: {data_mode}")
     ds_name = data_mode
     
-    embedding_name_part = "-emb" if embedding_params is not None else ""
-    local_file = os.path.join('cruft', 'datasets', f'imdb-{ds_name}-{max_seq_len}-{model_name}{embedding_name_part}.pt')
+    local_file = os.path.join(LOCAL_DATA_PATH, f'imdb-{ds_name}-{max_seq_len}-{model_name}.pt')
 
     if os.path.exists(local_file):
         print(f"Loading dataset from {local_file}")
         dataset = torch.load(local_file)
     else:
         print("Building dataset...")
-        dataset = _build_dataset(data_mode, max_seq_len, model_name, embedding_params)
+        dataset = _build_dataset(data_mode, max_seq_len, model_name)
 
         os.makedirs(os.path.dirname(local_file), exist_ok=True)
         torch.save(dataset, local_file)
         print(f"Dataset saved to {local_file}")
 
-    train_dataset = IMDBDataset(dataset['train'].shuffle())
-    test_dataset = IMDBDataset(dataset['test'].shuffle())
+    train_dataset = IMDBDataset(dataset['train'])
+    test_dataset = IMDBDataset(dataset['test'])
 
     return train_dataset, test_dataset

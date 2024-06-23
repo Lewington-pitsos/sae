@@ -29,8 +29,16 @@ class S3Store:
         local_file = os.path.join(self.local_dir, file_path)
         self.s3.upload_file(local_file, self.bucket_name, file_path)
 
+    def delete_all_remote(self):
+        paginator = self.s3.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=self.bucket_name):
+            for obj in page.get('Contents', []):
+                self.s3.delete_object(Bucket=self.bucket_name, Key=obj['Key'])
+
     def show_remote_files(self):
         response = self.s3.list_objects_v2(Bucket=self.bucket_name)
+        n_remote_objects = response.get('KeyCount', 0)
+        print(f"Total remote objects: {n_remote_objects}")
         for obj in response.get('Contents', []):
             print(obj['Key'])
 

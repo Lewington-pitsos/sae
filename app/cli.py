@@ -20,6 +20,8 @@ def handle_store(args):
         s3_store.sync()
     elif args.action == 'remote':
         s3_store.show_remote_files()
+    elif args.action == 'purge':
+        s3_store.delete_all_remote()
     elif args.action == 'create_bucket':
         s3_store.create_bucket_if_not_exists()
     else:
@@ -28,7 +30,7 @@ def handle_store(args):
 def handle_train(args):
     run_all()
 
-    print('ʕノ•ᴥ•ʔノ\ntraining complete, hopefully nothing went horribly wrong...\n')
+    print('\nʕノ•ᴥ•ʔノ\ntraining complete\n')
 
 def handle_runpod(args):
     if args.action == 'deploy':
@@ -48,7 +50,7 @@ def main():
 
     # Store tool
     parser_store = subparsers.add_parser('store', help='S3 storage related actions')
-    parser_store.add_argument('action', choices=['download', 'upload', 'overwrite_local', 'overwrite_remote', 'sync', 'remote', 'create_bucket'], help='Action to perform')
+    parser_store.add_argument('action', choices=['download', 'upload', 'overwrite_local', 'overwrite_remote', 'sync', 'purge', 'remote', 'create_bucket'], help='Action to perform')
     parser_store.add_argument('--file_path', type=str, help='Path to the file for the action')
     parser_store.add_argument('--local_dir', type=str, default=LOCAL_DATA_PATH, help='Local directory path')
     parser_store.set_defaults(func=handle_store)
