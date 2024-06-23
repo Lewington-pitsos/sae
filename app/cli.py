@@ -31,15 +31,15 @@ def handle_train(args):
     print('ʕノ•ᴥ•ʔノ\ntraining complete, hopefully nothing went horribly wrong...\n')
 
 def handle_runpod(args):
-    if args.action == 'create':
-        create_pod()
+    if args.action == 'deploy':
+        deploy_pod()
     elif args.action == 'purge':
         print('ʕノ•ᴥ•ʔノ\npurging all pods...\n')
         destroy_all_pods()
     elif args.action == 'show':
         show_pods()
 
-    print("°˖✧◝(⁰▿⁰)◜✧˖°")
+    print("\n°˖✧◝(⁰▿⁰)◜✧˖°")
 
 def main():
     parser = argparse.ArgumentParser(description='CLI for various tools.')
@@ -59,7 +59,7 @@ def main():
 
     # Runpod tool
     parser_runpod = subparsers.add_parser('runpod', help='Create a Runpod')
-    parser_runpod.add_argument('action', choices=['create', 'purge', 'show'], help='Action to perform')
+    parser_runpod.add_argument('action', choices=['deploy', 'purge', 'show'], help='Action to perform')
     parser_runpod.set_defaults(func=handle_runpod)
 
     args = parser.parse_args()
