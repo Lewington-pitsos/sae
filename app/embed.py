@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from app.models import SAEFeaturesModel, get_sae_model_config, masked_avg
 from app.constants import *
 from app.tok import load_tokenizer
-from datasets import load_dataset
+from load import smart_load_dataset
 
 def create_embeddings(dataset_name, max_seq_len=256, model_name='sae-classifier-mistral7b'):
     embedder = SAEFeaturesModel(
@@ -14,7 +14,7 @@ def create_embeddings(dataset_name, max_seq_len=256, model_name='sae-classifier-
         **get_sae_model_config(model_name)
     )
 
-    dataset = load_dataset(dataset_name)
+    dataset = smart_load_dataset(dataset_name)
 
     tokenizer = load_tokenizer(model_name)
     def tokenize_function(examples):

@@ -2,7 +2,7 @@ import os
 
 from torch.utils.data import DataLoader, Dataset
 import torch
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 
 from app.constants import *
 from app.tok import load_tokenizer
@@ -73,3 +73,10 @@ def load_imdb(data_mode, max_seq_len, model_name) -> IMDBDataset:
     test_dataset = IMDBDataset(dataset['test'])
 
     return train_dataset, test_dataset
+
+def smart_load_dataset(name):
+    if os.path.exists(name) and LOCAL_DATA_PATH in name:
+        return load_from_disk(name)
+    return load_dataset(name)
+
+
