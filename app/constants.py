@@ -26,3 +26,6 @@ if os.path.exists(CREDENTIALS_FILE):
 else:
     env = os.environ
     CRED = { **env }
+
+
+os.environ['HF_TOKEN'] = CRED['HF_TOKEN']

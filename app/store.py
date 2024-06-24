@@ -66,11 +66,11 @@ class S3Store:
                 if not remote_file_path.startswith('.'):
                     try:
                         self.s3.head_object(Bucket=self.bucket_name, Key=remote_file_path)
-                        print(file, '<----- already exists remotely')
+                        print(file)
                     except self.s3.exceptions.ClientError as e:
                         if e.response['Error']['Code'] == '404':
+                            print(file, '<----- uploading')
                             self.upload(local_file_path)
-                            print(file, '<----- uploaded')
 
         paginator = self.s3.get_paginator('list_objects_v2')
         for page in paginator.paginate(Bucket=self.bucket_name):
@@ -80,8 +80,8 @@ class S3Store:
                 if not remote_file_path.startswith('.'):
                     local_file_path = os.path.join(self.local_dir, remote_file_path)
                     if not os.path.exists(local_file_path):
+                        print(remote_file_path, '<----- deleteing from remote')
                         self.s3.delete_object(Bucket=self.bucket_name, Key=remote_file_path)
-                        print(remote_file_path, '<----- deleted from remote')
 
     def sync(self):
         for root, dirs, files in os.walk(self.local_dir):
@@ -92,11 +92,13 @@ class S3Store:
                 if not remote_file_path.startswith('.'):
                     try:
                         self.s3.head_object(Bucket=self.bucket_name, Key=remote_file_path)
-                        print(file, '<----- already exists remotely')
+                        print(file)
                     except self.s3.exceptions.ClientError as e:
                         if e.response['Error']['Code'] == '404':
+                            print(file, '<----- uploading')
                             self.upload(local_file_path)
-                            print(file, '<----- uploaded')
+
+        print('\n\n')
 
         paginator = self.s3.get_paginator('list_objects_v2')
         for page in paginator.paginate(Bucket=self.bucket_name):
@@ -107,7 +109,7 @@ class S3Store:
                     local_file_path = os.path.join(self.local_dir, remote_file_path)
                     if not os.path.exists(local_file_path):
                         os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
+                        print(remote_file_path, '<----- downloading')
                         self.download(remote_file_path)
-                        print(remote_file_path, '<----- downloaded')
                     else:
-                        print(remote_file_path, '<----- already exists locally')
+                        print(remote_file_path)

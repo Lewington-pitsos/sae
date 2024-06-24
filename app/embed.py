@@ -38,8 +38,8 @@ def create_embeddings(dataset_name, max_seq_len=256, model_name='sae-classifier-
 
                 all_avg_fts.append(embeddings_and_labels)
             
-            torch.save(torch.cat(all_avg_fts).squeeze(), f'{LOCAL_DATA_PATH}/avg-emb-gpt2-mistral-{ds_name}-{dataset_name.split("/")[-1]}.pt')
+            torch.save(torch.cat(all_avg_fts).squeeze(), f'{LOCAL_DATA_PATH}/avg-emb-{model_name}-{ds_name}-{dataset_name.split("/")[-1]}.pt')
 
 
-create_embeddings(f'./{LOCAL_DATA_PATH}/raft_ade_corpus_v2', model_name='sae-classifier-gpt2')
-create_embeddings(f'./{LOCAL_DATA_PATH}/raft_tweet_eval_hate', model_name='sae-classifier-gpt2')
+create_embeddings(f'./{LOCAL_DATA_PATH}/raft_ade_corpus_v2', model_name='sae-classifier-mistral7b')
+create_embeddings(f'./{LOCAL_DATA_PATH}/raft_tweet_eval_hate', model_name='sae-classifier-mistral7b')

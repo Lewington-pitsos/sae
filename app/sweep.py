@@ -32,15 +32,15 @@ def train():
 
     print(run_config)
 
-    model = xgb.train(run_config, dtrain, 5000, watchlist, custom_metric=accuracy_metric, early_stopping_rounds=200, maximize=True, callbacks=[LogEvaluation(5)])
+    model = xgb.train(run_config, dtrain, 5000, watchlist, custom_metric=f1_metric, early_stopping_rounds=200, maximize=True, callbacks=[LogEvaluation(5)])
 
     val_pred = model.predict(dval)
-    val_acc = accuracy(val_pred, dval)
+    val_acc = f1(val_pred, dval)
     wandb.log({"final-val-accuracy": val_acc})
     print(f"Validation accuracy: {val_acc}")
 
     holdout_pred = model.predict(dholdout)
-    holdout_acc = accuracy(holdout_pred, dholdout)
+    holdout_acc = f1(holdout_pred, dholdout)
     wandb.log({"final-holdout-accuracy": holdout_acc})
     print(f"Holdout accuracy: {holdout_acc}")
 
