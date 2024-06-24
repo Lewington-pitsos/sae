@@ -50,7 +50,7 @@ def accuracy(preds, ds):
 def accuracy_metric(preds, ds):
     return 'accuracy', accuracy(preds, ds)
 
-def train():
+def train(train_filename, test_filename):
     config_defaults = {
         'boosting': 'gbtree',  # Use tree based models
         'max_depth': 5,  # Increase depth
@@ -63,10 +63,7 @@ def train():
         'learning_rate': 0.05,
     }
     
-    dtrain, dval, dholdout = load_sae_feature_dataset(
-        f'{LOCAL_DATA_PATH}/avg-emb-gpt2-mistral-train.pt',
-        f'{LOCAL_DATA_PATH}/avg-emb-gpt2-mistral-test.pt'
-    )
+    dtrain, dval, dholdout = load_sae_feature_dataset(train_filename, test_filename)
 
     # Create watchlist
     watchlist = [(dtrain, 'train'), (dval, 'val'), (dholdout, 'holdout')]
@@ -74,9 +71,16 @@ def train():
     wandb.init(config=config_defaults, project="xgb-test")  # defaults are over-ridden during the sweep
 
     # Train the model with evaluation on the training and test sets, and early stopping
-    bst = xgb.train(config_defaults, dtrain, 10000, watchlist, custom_metric=accuracy_metric, maximize=True, callbacks=[LogEvaluation(1)])
+    bst = xgb.train(config_defaults, dtrain, 200, watchlist, custom_metric=accuracy_metric, maximize=True, callbacks=[LogEvaluation(1)])
 
 
     wandb.finish()
+
 if __name__ == '__main__':  
-    train()
+    for dataset_name in ['raft_tweet_eval_hate', 'raft_ade_corpus_v2']:
+        for split in ['train', 'test']:
+            train(
+                f'{LOCAL_DATA_PATH}/avg-emb-gpt2-mistral-{split}-{dataset_name}.pt',
+                f'{LOCAL_DATA_PATH}/avg-emb-gpt2-mistral-{split}-{dataset_name}.pt'
+            )
+    

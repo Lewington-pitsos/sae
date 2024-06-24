@@ -30,10 +30,8 @@ def validate_new_dataset(ds, expected_test_len):
     for label, count in label_counts.items():
         print(f"test {label}: {count}, {count / len(ds['train'])}")
 
-
     assert len(ds['train']) == 50, f"train size {len(ds['train'])}"
     assert len(ds['test']) == expected_test_len, f"test size {len(ds['test'])}"
-
 
 def reformat(example, text_name):
     label_remapping = {2: 0, 1: 1}
@@ -45,7 +43,6 @@ def reformat(example, text_name):
     del example['Label']
 
     return example
-
 
 def save_dataset(raft, name):
     dataset_name = f'{LOCAL_DATA_PATH}/raft_{name}'
@@ -112,14 +109,11 @@ def ingest_raft(raft_subset_name, raft_text_name, dataset, dataset_subset):
 
     def add_matching_label(example):
         text = example[raft_text_name]
-        # Check if the text matches any text in the ade_dict
         
         if text in mis_labelled and example['Label'] != 0:
             example['label'] = example['Label']
         else:
-            example['label'] = label_mapping[text_dict.get(text, None)]  # Adds None if no match found
-        
-
+            example['label'] = label_mapping[text_dict[text]] 
         return example
 
     raft = raft.map(add_matching_label)

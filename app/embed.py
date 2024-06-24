@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from app.models import SAEFeaturesModel, get_sae_model_config, masked_avg
 from app.constants import *
 from app.tok import load_tokenizer
-from load import smart_load_dataset
+from app.load import smart_load_dataset
 
 def create_embeddings(dataset_name, max_seq_len=256, model_name='sae-classifier-mistral7b'):
     embedder = SAEFeaturesModel(
@@ -38,7 +38,8 @@ def create_embeddings(dataset_name, max_seq_len=256, model_name='sae-classifier-
 
                 all_avg_fts.append(embeddings_and_labels)
             
-            torch.save(torch.cat(all_avg_fts).squeeze(), f'{LOCAL_DATA_PATH}/avg-emb-gpt2-mistral-{ds_name}.pt')
+            torch.save(torch.cat(all_avg_fts).squeeze(), f'{LOCAL_DATA_PATH}/avg-emb-gpt2-mistral-{ds_name}-{dataset_name.split("/")[-1]}.pt')
 
 
-create_embeddings(f'./{LOCAL_DATA_PATH}/ade_raft_labelled.pt', model_name='sae-classifier-gpt2')
+create_embeddings(f'./{LOCAL_DATA_PATH}/raft_ade_corpus_v2', model_name='sae-classifier-gpt2')
+create_embeddings(f'./{LOCAL_DATA_PATH}/raft_tweet_eval_hate', model_name='sae-classifier-gpt2')
