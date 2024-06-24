@@ -18,11 +18,11 @@ class S3Store:
         self.s3.download_file(self.bucket_name, file_path, local_file)
 
     def upload(self, file_path):
-        remote_file = file_path.replace(self.local_dir, "").lstrip('/')
+        remote_file = file_path.replace(self.local_dir + '/', "").lstrip('/')
         self.s3.upload_file(file_path, self.bucket_name, remote_file)
 
     def overwrite_local(self, file_path):
-        remote_file = file_path.replace(self.local_dir, "").lstrip('/')
+        remote_file = file_path.replace(self.local_dir + '/', "").lstrip('/')
         self.s3.download_file(self.bucket_name, remote_file, file_path)
 
     def overwrite_remote(self, file_path):
@@ -80,7 +80,6 @@ class S3Store:
                 if not remote_file_path.startswith('.'):
                     local_file_path = os.path.join(self.local_dir, remote_file_path)
                     if not os.path.exists(local_file_path):
-                        # delete remote file 
                         self.s3.delete_object(Bucket=self.bucket_name, Key=remote_file_path)
                         print(remote_file_path, '<----- deleted from remote')
 
