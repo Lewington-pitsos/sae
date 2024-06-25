@@ -1,7 +1,7 @@
 import argparse
 from app.store import S3Store
 from app.constants import *
-from app.train_imdb import run_all
+from app.train import run_all
 from app.rp import *
 
 def handle_store(args):

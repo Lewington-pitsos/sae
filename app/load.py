@@ -26,51 +26,35 @@ class IMDBDataset(Dataset):
 
         return input_ids, attention_mask, label
 
-def _build_dataset(data_mode, max_seq_len, model_name):
-    tokenizer = load_tokenizer(model_name)
-    dataset = load_dataset('imdb')
-
-    if data_mode in ['dry-run', 'one-batch']:
-        if data_mode == 'dry-run':
-            max_samples=100
-        elif data_mode == 'one-batch':
-            max_samples=4
-        else:
-            raise ValueError
-
-        dataset['train'] = dataset['train'].shuffle().select(range(max_samples))
-        dataset['test'] = dataset['test'].shuffle().select(range(max_samples))
-
-    del dataset['unsupervised'] 
-
-    def tokenize_function(examples):
-        return tokenizer(examples['text'], padding='max_length', truncation=True, max_length=max_seq_len)
-
-    dataset = dataset.map(tokenize_function, batched=True)
-
-    dataset_dict = {'train': list(dataset['train']), 'test': list(dataset['test'])}     
-    return dataset_dict
-
-def load_imdb(data_mode, max_seq_len, model_name) -> IMDBDataset:
-    if data_mode not in ['one-batch', 'dry-run', 'full']:
-        raise ValueError(f"Invalid setting: {data_mode}")
-    ds_name = data_mode
-    
-    local_file = os.path.join(LOCAL_DATA_PATH, f'imdb-{ds_name}-{max_seq_len}-{model_name}.pt')
+def load_imdb(max_seq_len, model_name) -> IMDBDataset:
+    local_file = os.path.join(LOCAL_DATA_PATH, f'imdb-{max_seq_len}-{model_name}.pt')
 
     if os.path.exists(local_file):
         print(f"Loading dataset from {local_file}")
         dataset = torch.load(local_file)
     else:
         print("Building dataset...")
-        dataset = _build_dataset(data_mode, max_seq_len, model_name)
+        tokenizer = load_tokenizer(model_name)
+        dataset = load_dataset('imdb')
 
+        if 'unsupervised' in dataset:
+            del dataset['unsupervised'] 
+
+        text_col = get_text_column(dataset)
+
+        def tokenize_function(examples):
+            return tokenizer(examples[text_col], padding='max_length', truncation=True, max_length=max_seq_len)
+
+        dataset = dataset.map(tokenize_function, batched=True)
+
+        dataset_dict = {'train': list(dataset['train']), 'test': list(dataset['test'])}     
+        
         os.makedirs(os.path.dirname(local_file), exist_ok=True)
-        torch.save(dataset, local_file)
+        torch.save(dataset_dict, local_file)
         print(f"Dataset saved to {local_file}")
 
-    train_dataset = IMDBDataset(dataset['train'])
-    test_dataset = IMDBDataset(dataset['test'])
+    train_dataset = IMDBDataset(dataset_dict['train'])
+    test_dataset = IMDBDataset(dataset_dict['test'])
 
     return train_dataset, test_dataset
 
