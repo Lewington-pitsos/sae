@@ -44,7 +44,7 @@ def f1(preds, ds):
     labels = ds.get_label()
     preds = preds > 0.5
 
-    f1 = f1_score(labels, preds)
+    f1 = f1_score(labels, preds, average='macro')
     return f1
 
 def f1_metric(preds, ds):
@@ -71,12 +71,12 @@ def train(train_filename, test_filename):
     wandb.init(config=config_defaults, project="xgb-test")  # defaults are over-ridden during the sweep
 
     # Train the model with evaluation on the training and test sets, and early stopping
-    bst = xgb.train(config_defaults, dtrain, 1000, watchlist, custom_metric=f1_metric, maximize=True, callbacks=[LogEvaluation(1)])
+    bst = xgb.train(config_defaults, dtrain, 1000, watchlist, custom_metric=f1_metric, maximize=True, callbacks=[LogEvaluation(100)])
 
 
     wandb.finish()
 
-if __name__ == '__main__':  
+if __name__ == '__main__':  # 0.46                  0.52
     for dataset_name in ['raft_tweet_eval_hate', 'raft_ade_corpus_v2']:
         train(
             f'{LOCAL_DATA_PATH}/avg-emb-sae-classifier-mistral7b-train-{dataset_name}.pt',

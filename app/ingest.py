@@ -127,7 +127,16 @@ def ingest_raft(raft_subset_name):
     
     expected_test_len = len(raft['test'])
 
+    def sub_one(example):
+        example['Label'] = example['Label'] - 1
+
+        if example['Label'] <= -1:
+            raise ValueError(f"invalid label: {example['Label']}, {example['text']}")
+
+        return example
+
     raft['test'] = raft['test'].map(add_matching_label)
+    raft['train'] = raft['train'].map(sub_one)
 
     validate_new_dataset(raft, expected_test_len)
 

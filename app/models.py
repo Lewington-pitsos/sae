@@ -180,7 +180,6 @@ class GPT2Classifier(nn.Module):
         for param in self.model.transformer.parameters():
             param.requires_grad = False
 
-
     def forward(self, input_ids, attention_mask):
         return self.model(input_ids=input_ids, attention_mask=attention_mask).logits
 

@@ -40,21 +40,21 @@ def embed_dataset(raft_dataset_name, model_name, tokenizer, embedder, max_seq_le
             for i, batch in tqdm.tqdm(enumerate(loader)):
                 embedding = embed(batch).to('cpu')
 
+                for j, emb in enumerate(embedding):
+                    dataset[ds_name][i * 16 + j][model_name] = emb.numpy().tolist()
+
                 embeddings_and_labels = torch.cat([embedding, batch['Label'].unsqueeze(-1)], dim=1)
 
                 all_avg_fts.append(embeddings_and_labels)
             
             torch.save(torch.cat(all_avg_fts).squeeze(), f'{LOCAL_DATA_PATH}/avg-emb-{max_seq_len}-{model_name}-{ds_name}-{raft_dataset_name}.pt')
 
+    dataset.save_to_disk(f'{LOCAL_DATA_PATH}/{raft_dataset_name}-with-embeddings')
+
 
 if __name__ == '__main__':
     embed_datasets(
-        dataset_names=[
-            'tweet_eval_hate',
-            'ade_corpus_v2',
-            'overruling',
-            'banking_77'
-        ],
+        dataset_names=RAFT_DATASETS,
         model_name='sae-classifier-gpt2',
         max_seq_len=256
     )

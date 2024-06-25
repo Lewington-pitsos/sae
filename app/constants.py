@@ -32,3 +32,11 @@ else:
 
 
 os.environ['HF_TOKEN'] = CRED['HF_TOKEN']
+
+
+RAFT_DATASETS = [
+    'tweet_eval_hate',
+    'ade_corpus_v2',
+    'overruling',
+    'banking_77'
+]
