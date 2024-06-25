@@ -103,6 +103,7 @@ class BigHeadGPT2SequenceClassifier(nn.Module):
         return x
 
 
+
 class SAEBaseModel(nn.Module):
     def __init__(self, 
                  transformer_name: str, 
@@ -146,7 +147,6 @@ class SAEFeaturesModel(SAEBaseModel):
 
         features = self.sae.encode(hidden_states)
         return features
-
 class SAEClassifier(SAEBaseModel):
     def forward(self, input_ids, attention_mask):
         _, cache = self.model.run_with_cache(input_ids, attention_mask=attention_mask, prepend_bos=True, stop_at_layer=self.hook_layer + 1)

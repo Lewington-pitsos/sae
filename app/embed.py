@@ -49,13 +49,13 @@ def embed_dataset(raft_dataset_name, model_name, tokenizer, embedder, max_seq_le
             
             torch.save(torch.cat(all_avg_fts).squeeze(), f'{LOCAL_DATA_PATH}/avg-emb-{max_seq_len}-{model_name}-{ds_name}-{raft_dataset_name}.pt')
 
-    dataset.save_to_disk(f'{LOCAL_DATA_PATH}/{raft_dataset_name}-with-embeddings')
+    dataset.save_to_disk(f'{LOCAL_DATA_PATH}/{raft_dataset_name}-with-{model_name}-embeddings')
 
 
 if __name__ == '__main__':
     embed_datasets(
         dataset_names=RAFT_DATASETS,
-        model_name='sae-classifier-gpt2',
+        model_name='sae-classifier-mistral7b',
         max_seq_len=256
     )
 

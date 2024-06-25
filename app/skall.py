@@ -9,8 +9,8 @@ results = {}
 
 for dataset_name in RAFT_DATASETS:
     results[dataset_name] = {}
-    train_filename = f'{LOCAL_DATA_PATH}/avg-emb-256-sae-classifier-gpt2-train-{dataset_name}.pt'
-    test_filename = f'{LOCAL_DATA_PATH}/avg-emb-256-sae-classifier-gpt2-test-{dataset_name}.pt'
+    train_filename = f'{LOCAL_DATA_PATH}/avg-emb-256-sae-classifier-mistral7b-train-{dataset_name}.pt'
+    test_filename = f'{LOCAL_DATA_PATH}/avg-emb-256-sae-classifier-mistral7b-test-{dataset_name}.pt'
 
     train = torch.load(train_filename)
     test = torch.load(test_filename)
@@ -40,5 +40,5 @@ for dataset_name in RAFT_DATASETS:
                 'f1': f1
             }
 
-            with open('cruft/results-macrof1.json', 'w') as f:
+            with open('cruft/results-macrof1-mistral7b.json', 'w') as f:
                 json.dump(results, f)

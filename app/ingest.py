@@ -162,7 +162,5 @@ RAFT_PARAMS = {
 }
 
 if __name__ == '__main__':
-    ingest_and_save_raft('tweet_eval_hate')
-    ingest_and_save_raft('ade_corpus_v2')
-    ingest_and_save_raft('overruling')
-    ingest_and_save_raft('banking_77')    
+    for dataset_name in RAFT_DATASETS:
+        ingest_and_save_raft(dataset_name)
