@@ -26,7 +26,7 @@ class IMDBDataset(Dataset):
 
         return input_ids, attention_mask, label
 
-def load_imdb(max_seq_len, model_name) -> IMDBDataset:
+def load_imdb(dataset_name, max_seq_len, model_name) -> IMDBDataset:
     local_file = os.path.join(LOCAL_DATA_PATH, f'imdb-{max_seq_len}-{model_name}.pt')
 
     if os.path.exists(local_file):
@@ -35,7 +35,7 @@ def load_imdb(max_seq_len, model_name) -> IMDBDataset:
     else:
         print("Building dataset...")
         tokenizer = load_tokenizer(model_name)
-        dataset = load_dataset('imdb')
+        dataset = smart_load_dataset(dataset_name)
 
         if 'unsupervised' in dataset:
             del dataset['unsupervised'] 

@@ -79,7 +79,7 @@ def run(params):
 
     metrics.init(project="imdb-gpt2-classification", config=params.copy())
 
-    train_dataset, test_dataset = load_imdb(max_seq_len=params['max_seq_len'], model_name=params['model_name'])
+    train_dataset, test_dataset = load_imdb(dataset_name=params['dataset_name'], max_seq_len=params['max_seq_len'], model_name=params['model_name'])
     metrics.log_label_ratio(train_dataset, 'train')
     metrics.log_label_ratio(test_dataset, 'test')
 
