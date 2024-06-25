@@ -53,7 +53,7 @@ for dataset_name in ['raft_tweet_eval_hate', 'raft_ade_corpus_v2']:
             y_pred = clf.predict(X_test)
             # Evaluate the classifier
             accuracy = accuracy_score(y_test, y_pred)
-            f1 = f1_score(y_test, y_pred)
+            f1 = f1_score(y_test, y_pred, average='macro')
             print(f'{name}: acc:{accuracy}, f1:{f1}')
 
             results[dataset_name][name] = {
@@ -61,7 +61,7 @@ for dataset_name in ['raft_tweet_eval_hate', 'raft_ade_corpus_v2']:
                 'f1': f1
             }
 
-            with open('cruft/results.json', 'w') as f:
+            with open('cruft/results-macrof1.json', 'w') as f:
                 json.dump(results, f)
         except Exception as e:
             print(f'{name} failed: {str(e)}')
