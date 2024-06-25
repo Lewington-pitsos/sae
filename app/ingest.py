@@ -1,7 +1,7 @@
 from datasets import load_dataset
 
 from app.constants import *
-
+from app.load import get_text_column
 
 todo = {
     # 'neurips_impact_statement_risks': None, < ---------- no labels
@@ -53,7 +53,12 @@ def validate_new_dataset(ds, expected_test_len):
     assert len(ds['train']) == 50, f"train size {len(ds['train'])}"
     assert len(ds['test']) == expected_test_len, f"test size {len(ds['test'])}"
 
-def ingest_raft(raft_subset_name, raft_text_name, dataset, dataset_subset, label_mapping, text_key):
+def ingest_raft(raft_subset_name):
+    params = RAFT_PARAMS[raft_subset_name]
+    dataset = params['dataset']
+    dataset_subset = params['dataset_subset']
+    label_mapping = params['label_mapping']
+    text_key = params['text_key']
 
     label_data = load_dataset(dataset, dataset_subset)
 
@@ -92,6 +97,8 @@ def ingest_raft(raft_subset_name, raft_text_name, dataset, dataset_subset, label
         for text in mis_labelled[:5]:
             print(text)
 
+    raft = load_dataset("ought/raft", raft_subset_name, cache_dir="cache")
+    raft_text_name = get_text_column(raft)
     def add_matching_label(example):
         text = example[raft_text_name]
         
@@ -106,7 +113,10 @@ def ingest_raft(raft_subset_name, raft_text_name, dataset, dataset_subset, label
         
         raft_label = label_mapping[label_for_text]
         
-        new_raft_label = raft['train'].features['Label'].str2int(raft_label)
+        new_raft_label = raft['train'].features['Label'].str2int(raft_label) - 1
+
+        if new_raft_label <= -1:
+            raise ValueError(f"invalid label: {new_raft_label}, {text}")
 
         if new_raft_label != example['Label'] and example['Label'] != 0:
             raise ValueError(f"mismatched labels: {new_raft_label}, {example['Label']}, {text}")
@@ -115,26 +125,35 @@ def ingest_raft(raft_subset_name, raft_text_name, dataset, dataset_subset, label
 
         return example
     
-    raft = load_dataset("ought/raft", raft_subset_name, cache_dir="cache")
     expected_test_len = len(raft['test'])
 
     raft['test'] = raft['test'].map(add_matching_label)
 
     validate_new_dataset(raft, expected_test_len)
 
-    raft.save_to_disk(f'cruft/raft_{raft_subset_name}')
+    return raft
+
+def ingest_and_save_raft(raft_subset_name):
+    labelled_dataset = ingest_raft(raft_subset_name)
+
+    labelled_dataset.save_to_disk(f'cruft/raft_{raft_subset_name}')
 
 
-# ingest_raft('tweet_eval_hate', 'Tweet', 'cardiffnlp/tweet_eval', 'hate', {
-#     'non-hate': 'not hate speech', 'hate': 'hate speech'
-# }, 'text')
-# ingest_raft('ade_corpus_v2', 'Sentence', 'ade-benchmark-corpus/ade_corpus_v2', 'Ade_corpus_v2_classification', {
-#     'Not-Related': 'not ADE-related', 'Related': 'ADE-related'
-# }, 'text')
+RAFT_PARAMS = {
+    'tweet_eval_hate': {'dataset': 'cardiffnlp/tweet_eval', 'dataset_subset': 'hate', 'label_mapping':{
+        'non-hate': 'not hate speech', 'hate': 'hate speech'
+    }, 'text_key': 'text'},
+    'ade_corpus_v2': {'dataset': 'ade-benchmark-corpus/ade_corpus_v2', 'dataset_subset': 'Ade_corpus_v2_classification', 'label_mapping':{
+        'Not-Related': 'not ADE-related', 'Related': 'ADE-related'
+    }, 'text_key': 'text'},
+    'overruling': {'dataset': 'LawInformedAI/overruling', 'dataset_subset': None, 'label_mapping':{
+        0: 'not overruling', 1: 'overruling'
+    }, 'text_key': 'sentence1'},
+    'banking_77': {'dataset': 'legacy-datasets/banking77', 'dataset_subset': None, 'label_mapping': None, 'text_key': 'text'},
+}
 
-# ingest_raft('overruling', 'Sentence', 'LawInformedAI/overruling', None, {
-#     0: 'not overruling', 1: 'overruling'
-# }, 'sentence1')
-
-
-ingest_raft('banking_77', 'Query', 'legacy-datasets/banking77', None, None, 'text')
+if __name__ == '__main__':
+    ingest_and_save_raft('tweet_eval_hate')
+    ingest_and_save_raft('ade_corpus_v2')
+    ingest_and_save_raft('overruling')
+    ingest_and_save_raft('banking_77')    

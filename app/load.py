@@ -79,4 +79,5 @@ def smart_load_dataset(name):
         return load_from_disk(name)
     return load_dataset(name)
 
-
+def get_text_column(dataset):
+    return list(set(dataset['train'].column_names) - set(NON_TEXT_COLUMNS))[0]

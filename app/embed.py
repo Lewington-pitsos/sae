@@ -5,20 +5,26 @@ from torch.utils.data import DataLoader
 from app.models import SAEFeaturesModel, get_sae_model_config, masked_avg
 from app.constants import *
 from app.tok import load_tokenizer
-from app.load import smart_load_dataset
+from app.load import get_text_column
+from app.ingest import ingest_raft
 
-def create_embeddings(dataset_name, max_seq_len=256, model_name='sae-classifier-mistral7b'):
+def embed_datasets(dataset_names, model_name, max_seq_len=256):
     embedder = SAEFeaturesModel(
         device=DEVICE,
         max_seq_len=max_seq_len,
         **get_sae_model_config(model_name)
     )
-
-    dataset = smart_load_dataset(dataset_name)
-
     tokenizer = load_tokenizer(model_name)
+
+    for raft_dataset_name in dataset_names:
+        embed_dataset(raft_dataset_name, model_name, tokenizer, embedder, max_seq_len)
+
+def embed_dataset(raft_dataset_name, model_name, tokenizer, embedder, max_seq_len=256):
+    dataset = ingest_raft(raft_dataset_name)
+    text_column = get_text_column(dataset)
+
     def tokenize_function(examples):
-        return tokenizer(examples['text'], padding='max_length', truncation=True, max_length=max_seq_len)
+        return tokenizer(examples[text_column], padding='max_length', truncation=True, max_length=max_seq_len)
     dataset = dataset.map(tokenize_function, batched=True)
 
     def embed(examples):
@@ -34,12 +40,22 @@ def create_embeddings(dataset_name, max_seq_len=256, model_name='sae-classifier-
             for i, batch in tqdm.tqdm(enumerate(loader)):
                 embedding = embed(batch).to('cpu')
 
-                embeddings_and_labels = torch.cat([embedding, batch['label'].unsqueeze(-1)], dim=1)
+                embeddings_and_labels = torch.cat([embedding, batch['Label'].unsqueeze(-1)], dim=1)
 
                 all_avg_fts.append(embeddings_and_labels)
             
-            torch.save(torch.cat(all_avg_fts).squeeze(), f'{LOCAL_DATA_PATH}/avg-emb-{model_name}-{ds_name}-{dataset_name.split("/")[-1]}.pt')
+            torch.save(torch.cat(all_avg_fts).squeeze(), f'{LOCAL_DATA_PATH}/avg-emb-{max_seq_len}-{model_name}-{ds_name}-{raft_dataset_name}.pt')
 
 
-create_embeddings(f'./{LOCAL_DATA_PATH}/raft_ade_corpus_v2', model_name='sae-classifier-mistral7b')
-create_embeddings(f'./{LOCAL_DATA_PATH}/raft_tweet_eval_hate', model_name='sae-classifier-mistral7b')
+if __name__ == '__main__':
+    embed_datasets(
+        dataset_names=[
+            'tweet_eval_hate',
+            'ade_corpus_v2',
+            'overruling',
+            'banking_77'
+        ],
+        model_name='sae-classifier-gpt2',
+        max_seq_len=256
+    )
+
