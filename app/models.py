@@ -7,13 +7,14 @@ from transformer_lens import HookedTransformer
 from app.constants import *
 
 class SimpleGPT2SequenceClassifier(nn.Module):
-    def __init__(self, hidden_size: int, max_seq_len: int, gpt_model_name: str, num_classes: int = 2, freeze=False):
+    def __init__(self, model_size:str, max_seq_len: int, num_classes: int = 2):
         super(SimpleGPT2SequenceClassifier, self).__init__()
-        self.gpt2model = GPT2Model.from_pretrained(gpt_model_name)
-        if freeze:
-            for param in self.gpt2model.parameters():
-                param.requires_grad = False
-        self.fc1 = nn.Linear(hidden_size * max_seq_len, num_classes, bias=False)
+        self.gpt2model = GPT2Model.from_pretrained(model_size)
+        final_hidden_size = self.gpt2model.config.n_embd
+
+        for param in self.gpt2model.parameters():
+            param.requires_grad = False
+        self.fc1 = nn.Linear(final_hidden_size * max_seq_len, num_classes, bias=False)
 
     def forward(self, input_ids, attention_mask):
         gpt_out = self.gpt2model(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
@@ -73,6 +74,11 @@ class GPTProbabilityClassifier(nn.Module):
 
         self.softmax = nn.Softmax(dim=1)    
 
+        # freeze all parameters
+
+        for param in self.model.parameters():
+            param.requires_grad = False
+
     def forward(self, input_ids, attention_mask):
         probabilities = []
 
@@ -96,9 +102,11 @@ class GPTProbabilityClassifier(nn.Module):
 
 
 class RandomClassifier(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, device):
         super(RandomClassifier, self).__init__()
-        self.fc1 = nn.Linear(2, 2)
+        self.fc1 = nn.Linear(2, 2, bias=False) # only here so we don't get error when no gradients are being computed
+        self.device = device
+        self.fc1.to(device)
 
     def forward(self, input_ids, attention_mask):
         batch_size = input_ids.shape[0]
@@ -106,6 +114,8 @@ class RandomClassifier(torch.nn.Module):
 
         one_hot_tensor = torch.zeros(batch_size, 2)
         one_hot_tensor[torch.arange(batch_size), random_predictions[0]] = 1
+
+        one_hot_tensor = one_hot_tensor.to(self.device)
 
         x = self.fc1(one_hot_tensor)
         return x
@@ -118,6 +128,7 @@ class SAEBaseModel(nn.Module):
                  device, 
                  max_seq_len:int = None, 
                  num_classes: int = 2,
+                 freeze_sae: bool = True
         ):
         super(SAEBaseModel, self).__init__()
 
@@ -125,8 +136,9 @@ class SAEBaseModel(nn.Module):
 
         self.sae = sae
 
-        for param in self.sae.parameters():
-            param.requires_grad = False
+        if freeze_sae:
+            for param in self.sae.parameters():
+                param.requires_grad = False
 
         seq_len = int(max_seq_len / 8)
 
@@ -175,14 +187,14 @@ class SAEClassifier(SAEBaseModel):
         return x
 
 class GPT2Classifier(nn.Module):
-    def __init__(self, gpt_model_name):
+    def __init__(self, model_size):
         super(GPT2Classifier, self).__init__()
 
-        config = AutoConfig.from_pretrained(gpt_model_name)
+        config = AutoConfig.from_pretrained(model_size)
         config.num_labels = 2
         config.pad_token_id = config.eos_token_id
         config.problem_type = "single_label_classification"
-        self.model = GPT2ForSequenceClassification.from_pretrained(gpt_model_name, config=config)
+        self.model = GPT2ForSequenceClassification.from_pretrained(model_size, config=config)
 
         for param in self.model.transformer.parameters():
             param.requires_grad = False
@@ -191,7 +203,7 @@ class GPT2Classifier(nn.Module):
         return self.model(input_ids=input_ids, attention_mask=attention_mask).logits
 
 def get_sae_model_config(model_name):
-    if model_name == 'sae-classifier-gpt2':
+    if model_name == 'sae-classifier-gpt':
         return {
             'transformer_name': 'gpt2',
             'sae_release': 'gpt2-small-res-jb',
@@ -230,19 +242,19 @@ def get_probability_model_config(dataset_name):
 
     raise ValueError(f"Invalid dataset name: {dataset_name}")
 
-def build_model(model_type, model_size, dataset_name, hidden_size, max_seq_len, freeze, device):
+def build_model(model_type, model_size, dataset_name, max_seq_len, freeze, device):
     if model_type == 'simple':
-        return SimpleGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=max_seq_len, gpt_model_name='gpt2', freeze=freeze)
+        return SimpleGPT2SequenceClassifier(model_size=model_size, max_seq_len=max_seq_len)
     elif model_type == 'probability':
         return GPTProbabilityClassifier(model_size=model_size, **get_probability_model_config(dataset_name), device=device)
     elif model_type == 'sae-classifier-gpt':
-        return SAEClassifier(device=device, max_seq_len=max_seq_len, **get_sae_model_config(model_type))
+        return SAEClassifier(device=device, max_seq_len=max_seq_len, freeze_sae=freeze, **get_sae_model_config(model_type))
     elif model_type == 'sae-classifier-mistral7b':
-        return SAEClassifier(device=device, max_seq_len=max_seq_len, **get_sae_model_config(model_type))
+        return SAEClassifier(device=device, max_seq_len=max_seq_len, freeze_sae=freeze, **get_sae_model_config(model_type))
     elif model_type == 'random':
-        return RandomClassifier()
+        return RandomClassifier(device)
     elif model_type == 'gpt2-classifier': 
-        return GPT2Classifier('gpt2').to(device)
+        return GPT2Classifier(model_size=model_size).to(device)
         
     raise ValueError(f"Invalid model type: {model_type}")
 

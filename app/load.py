@@ -35,7 +35,7 @@ class IMDBDataset(Dataset):
         return input_ids, attention_mask, label
 
 def load_ds(dataset_name, max_seq_len, model_type) -> IMDBDataset:
-    local_file = os.path.join(LOCAL_DATA_PATH, f'imdb-{max_seq_len}-{model_type}.pt')
+    local_file = os.path.join(LOCAL_DATA_PATH, f'{dataset_name.replace("/", "-")}-{max_seq_len}.pt')
 
     if os.path.exists(local_file):
         print(f"Loading dataset from {local_file}")

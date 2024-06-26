@@ -7,6 +7,7 @@ from transformers import GPT2Tokenizer
 import random
 from app.viz import log_model_parameters_info
 from app.tok import load_tokenizer
+from sklearn.metrics import f1_score
 
 class MetricsLogger():
     def __init__(self, model_type, skip_wandb=False):
@@ -18,44 +19,56 @@ class MetricsLogger():
         self.tokenizer = load_tokenizer(model_type)
         self.train_losses = []
         self.train_acc = []
+        self.train_f1 = []
         self.test_losses = []
         self.test_acc = []
+        self.test_f1 = []
         self.epoch = 0
         self.skip_wandb = skip_wandb
         self.start = time.time()
 
     def init(self, *args, **kwargs):
-        
         if not self.skip_wandb:
             wandb.init(reinit=True, *args, **kwargs)
 
     def step_epoch(self):
         avg_train_loss = sum(self.train_losses) / len(self.train_losses)
         avg_train_accuracy = sum(self.train_acc) / len(self.train_acc)
+        avg_train_f1 = sum(self.train_f1) / len(self.train_f1)
         self.train_losses = []
         self.train_acc = []
-        print(f"Epoch {self.epoch + 1}, Train Loss: {avg_train_loss}, Train Accuracy: {avg_train_accuracy}")
+        self.train_f1 = []
+        print(f"Epoch {self.epoch + 1}, Train Loss: {avg_train_loss}, Train Acc: {avg_train_accuracy}, Train F1 {avg_train_f1}")
 
         avg_test_loss = sum(self.test_losses) / len(self.test_losses)
         avg_test_accuracy = sum(self.test_acc) / len(self.test_acc)
-        print(f"Epoch {self.epoch + 1}, Test Loss: {avg_test_loss}, Test Accuracy: {avg_test_accuracy}")
+        avg_test_f1 = sum(self.test_f1) / len(self.test_f1)
+        self.test_losses = []
+        self.test_acc = []
+        self.test_f1 = []
+        print(f"Epoch {self.epoch + 1}, Test Loss: {avg_test_loss}, Test Acc: {avg_test_accuracy}, Test F1: {avg_test_f1}")
 
         if not self.skip_wandb:
-            wandb.log({"train_loss": avg_train_loss, "train_accuracy": avg_train_accuracy})
-            wandb.log({"test_loss": avg_test_loss, "test_accuracy": avg_test_accuracy})
+            wandb.log({"train_loss": avg_train_loss, "train_accuracy": avg_train_accuracy, "train_f1": avg_train_f1})
+            wandb.log({"test_loss": avg_test_loss, "test_accuracy": avg_test_accuracy, "test_f1": avg_test_f1})
 
         self.epoch += 1
 
     def log_train_batch(self, loss, labels, outputs, lr):
         self.train_losses.append(loss)
-        acc = ((torch.argmax(outputs, dim=-1) == labels) * 1.0).mean().item()
+        pred_classes = torch.argmax(outputs, dim=-1)
+        acc = ((pred_classes == labels) * 1.0).mean().item()
         self.train_acc.append(acc)
+        f1 = f1_score(labels.cpu().numpy(), pred_classes.cpu().numpy(), average='macro')
+        self.train_f1.append(f1)
         if not self.skip_wandb:
-            wandb.log({"train_batch_loss": loss, "batch_learning_rate": lr, "train_batch_accuracy": acc})
+            wandb.log({"train_batch_loss": loss, "batch_learning_rate": lr, "train_batch_accuracy": acc, "train_batch_f1": f1})
 
     def log_test_batch(self, batch_idx, loss, labels, outputs, input_ids):
         self.test_losses.append(loss)
-        self.test_acc.append(((torch.argmax(outputs, dim=-1) == labels) * 1.0).mean().item())
+        pred_classes = torch.argmax(outputs, dim=-1)
+        self.test_acc.append(((pred_classes == labels) * 1.0).mean().item())
+        self.test_f1.append(f1_score(labels.cpu().numpy(), pred_classes.cpu(), average='macro'))
 
         if batch_idx == 0 and not self.skip_wandb:
             input_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in input_ids[:4]]

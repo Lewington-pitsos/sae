@@ -31,8 +31,11 @@ def train(metrics: MetricsLogger, model, train_dataset, test_dataset, lr, epochs
             optimizer.zero_grad()
             outputs = model(input_ids=input_ids, attention_mask=attention_mask)
             loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
+            # some models have no trainable parameters. Check if there are any gardients to calculate 
+
+            if any(param.requires_grad for param in model.parameters()):
+                loss.backward()
+                optimizer.step()
 
             metrics.log_train_batch(
                 loss=loss.item(), 
@@ -93,7 +96,6 @@ def run(params, project):
         params['model_type'], 
         model_size=params['model_size'],
         dataset_name=params['dataset_name'],
-        hidden_size=params['hidden_size'], 
         freeze=params['freeze'], 
         max_seq_len=params['max_seq_len'], 
         device=DEVICE,
@@ -106,9 +108,9 @@ def run(params, project):
         return
 
     if 'dry_run' in params and params['dry_run']:
-        # filter the training dataset down to the first 10 items
-        train_dataset.tokenized_dataset = train_dataset.tokenized_dataset[:10]
-        test_dataset.tokenized_dataset = test_dataset.tokenized_dataset[:10]
+        # filter both datasets down by randomly selecting 10 samples
+        train_dataset = torch.utils.data.Subset(train_dataset, torch.randperm(len(train_dataset))[:10])
+        test_dataset = torch.utils.data.Subset(test_dataset, torch.randperm(len(test_dataset))[:10])
 
 
     train(metrics, model, train_dataset, test_dataset, batch_size=params['batch_size'], epochs=params['epochs'], lr=params['lr'], device=DEVICE)

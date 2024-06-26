@@ -74,8 +74,8 @@ def ingest_raft(raft_subset_name):
                 if variation + text in text_dict:
                     label_for_text = text_dict[variation + text]
                     break
-                else:
-                    raise ValueError(f"could not find label for text: {text}")
+            else:
+                raise ValueError(f"could not find label for text: {text}")
 
         raft_label = label_mapping[label_for_text]
         
@@ -128,6 +128,6 @@ RAFT_PARAMS = {
 }
 
 if __name__ == '__main__':
-    ingest_and_save_raft('tweet_eval_hate')
+    ingest_and_save_raft('overruling')
     # for dataset_name in RAFT_DATASETS:
         # ingest_and_save_raft(dataset_name)

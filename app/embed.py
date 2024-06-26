@@ -54,8 +54,8 @@ def embed_dataset(raft_dataset_name, model_name, tokenizer, embedder, max_seq_le
 
 if __name__ == '__main__':
     embed_datasets(
-        dataset_names=RAFT_DATASETS,
-        model_name='sae-classifier-mistral7b',
+        dataset_names=['overruling'],
+        model_name='sae-classifier-gpt',
         max_seq_len=256
     )
 

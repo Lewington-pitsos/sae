@@ -56,7 +56,7 @@ def handle_runpod(args):
 def handle_build_params(args):
     build()
 
-    print("\n/ᐠ-ꞈ-ᐟ\\nnyan\n")
+    print("\n/ᐠ-ꞈ-ᐟ\ \nnyan\n")
 
 def main():
     parser = argparse.ArgumentParser(description='CLI for various tools.')
