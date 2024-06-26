@@ -34,7 +34,7 @@ def handle_store(args):
 def handle_train(args):
     print('\n┏ʕ •ᴥ•ʔ┛\ntime to train\n')
     
-    run_all(args.project)
+    run_all(args.project, args.params)
 
     print('\nʕノ•ᴥ•ʔノ\ntraining complete\n')
 
@@ -72,6 +72,7 @@ def main():
 
     # Train tool
     parser_train = subparsers.add_parser('train', help='Train the IMDB model')
+    parser_train.add_argument('--params', type=str, help='Path to the parameters file', default='.params.json')
     parser_train.add_argument('--project', type=str, help='Wandb project name', default='')
     parser_train.set_defaults(func=handle_train)
 

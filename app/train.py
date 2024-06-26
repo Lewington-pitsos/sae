@@ -115,8 +115,8 @@ def run(params, project):
 
     train(metrics, model, train_dataset, test_dataset, batch_size=params['batch_size'], epochs=params['epochs'], lr=params['lr'], device=DEVICE)
 
-def run_all(project='imdb-gpt2-classification'):
-    with open('.params.json') as f:
+def run_all(project='imdb-gpt2-classification', param_file='.params.json'):
+    with open(param_file) as f:
         runs = json.load(f)
 
     for r in runs:
