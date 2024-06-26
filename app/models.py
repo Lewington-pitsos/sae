@@ -23,6 +23,47 @@ class SimpleGPT2SequenceClassifier(nn.Module):
         return linear_output
 
 
+class BigHeadGPT2SequenceClassifier(nn.Module):
+    def __init__(self,
+            model_size: str, 
+            max_seq_len: int, 
+            num_classes: int = 2, 
+            activation: str = 'relu',
+            head_hidden_size: int = 8192
+        ):
+        super(BigHeadGPT2SequenceClassifier, self).__init__()
+        self.gpt2model = GPT2Model.from_pretrained(model_size)
+        hidden_size = self.gpt2model.config.n_embd
+
+        for param in self.gpt2model.parameters():
+            param.requires_grad = False
+
+        self.fc1 = nn.Linear(hidden_size, head_hidden_size)
+
+        self.activation = self._get_activation(activation)
+
+        self.fc2 = nn.Linear(head_hidden_size * max_seq_len, num_classes, bias=False)
+
+    def _get_activation(self, activation):
+        if activation == 'relu':
+            return nn.ReLU()
+        elif activation == 'sigmoid':
+            return nn.Sigmoid()
+        elif activation == 'tanh':
+            return nn.Tanh()
+        else:
+            raise ValueError(f"Invalid activation function: {activation}")
+
+    def forward(self, input_ids, attention_mask):
+        gpt_out = self.gpt2model(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
+
+        x = self.fc1(gpt_out)
+        x = self.activation(x)
+        x = x.view(x.shape[0], -1)
+        x = self.fc2(x)
+
+        return x
+
 def inject_phrase(input_ids, phrase, pad_token, attention_mask, device):
     phrase_length = phrase.size(0)
     seq_len = input_ids.size(1)
@@ -242,9 +283,11 @@ def get_probability_model_config(dataset_name):
 
     raise ValueError(f"Invalid dataset name: {dataset_name}")
 
-def build_model(model_type, model_size, dataset_name, max_seq_len, freeze, device):
+def build_model(model_type, model_size, dataset_name, max_seq_len, freeze, activation, device):
     if model_type == 'simple':
         return SimpleGPT2SequenceClassifier(model_size=model_size, max_seq_len=max_seq_len)
+    if model_type == 'big-head':
+        return BigHeadGPT2SequenceClassifier(model_size=model_size, max_seq_len=max_seq_len, activation=activation)
     elif model_type == 'probability':
         return GPTProbabilityClassifier(model_size=model_size, **get_probability_model_config(dataset_name), device=device)
     elif model_type == 'sae-classifier-gpt':

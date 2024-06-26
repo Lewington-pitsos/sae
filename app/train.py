@@ -97,7 +97,8 @@ def run(params, project):
         model_size=params['model_size'],
         dataset_name=params['dataset_name'],
         freeze=params['freeze'], 
-        max_seq_len=params['max_seq_len'], 
+        max_seq_len=params['max_seq_len'],
+        activation=params['activation'], 
         device=DEVICE,
     )
     metrics.log_model_params(model)

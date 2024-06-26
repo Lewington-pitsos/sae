@@ -17,41 +17,28 @@ def get_batch_size(model_size):
 def build():
     default = {
         "batch_size": 256,
-        "lr": 1e-5,
-        "epochs": 5,
+        "lr": 1e-4,
+        "epochs": 8,
         "model_size": "gpt2",
         "freeze": True,
         "dataset_name": "data/raft_tweet_eval_hate",
         "model_type": "probability",
         "skip_wandb": False,
         "max_seq_len": 256,
+        "activation": "relu",
         "skip_training": False,
         "dry_run": False
     }
 
     all_params = []
     for dataset_name in COMPILED_DATASETS:
-        for model_type in ['probability', 'simple', 'sae-classifier-gpt', 'random', 'gpt2-classifier']:
+        for model_type in ['simple', 'sae-classifier-gpt']:
             clone = default.copy()
-
-            if model_type in ['random', 'probability']:
-                clone['epochs'] = 1
-
             clone['model_type'] = model_type
             clone['dataset_name'] = dataset_name
+            if dataset_name in ['data/raft_tweet_eval_hate', 'data/ade_corpus_v2', 'data/raft_overruling']:
+                clone['epochs'] = 15
             all_params.append(clone)
-
-            if model_type in ['simple', 'gpt2-classifier', 'probability']:
-                for model_size in ['gpt2-medium', 'gpt2-large', 'gpt2-xl']:
-                    clone = clone.copy()
-                    clone['model_size'] = model_size
-                    clone['batch_size'] = get_batch_size(model_size)
-                    all_params.append(clone)
-            elif model_type in ['sae-classifier-gpt']:
-                clone = clone.copy()
-                clone['freeze'] = False
-                clone['batch-size'] = 32
-                all_params.append(clone) 
 
     print(f'built {len(all_params)} params')
     with open('.params.json', 'w') as f:
