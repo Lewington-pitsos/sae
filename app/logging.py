@@ -1,5 +1,6 @@
 import wandb
 import torch
+import time
 
 from transformers import GPT2Tokenizer
 
@@ -8,19 +9,20 @@ from app.viz import log_model_parameters_info
 from app.tok import load_tokenizer
 
 class MetricsLogger():
-    def __init__(self, model_name, skip_wandb=False):
+    def __init__(self, model_type, skip_wandb=False):
         if not skip_wandb:
             self.batch1_table = wandb.Table(columns=["epoch", "idx", "input_text", "label", "prediction", "logits"])
         else:
             self.batch1_table = None
 
-        self.tokenizer = load_tokenizer(model_name)
+        self.tokenizer = load_tokenizer(model_type)
         self.train_losses = []
         self.train_acc = []
         self.test_losses = []
         self.test_acc = []
         self.epoch = 0
         self.skip_wandb = skip_wandb
+        self.start = time.time()
 
     def init(self, *args, **kwargs):
         if not self.skip_wandb:
@@ -63,13 +65,17 @@ class MetricsLogger():
                 self.batch1_table.add_data(self.epoch, i, input_texts[i], labels[i], predictions[i], outputs[i])
 
     def finalize(self):
+        elapsed_seconds = time.time() - self.start
+        print(f"Training took {elapsed_seconds:.2f} seconds")
         if not self.skip_wandb:
+            wandb.log({"elapsed_seconds": elapsed_seconds})
             wandb.log({f"batch_1": self.batch1_table})
             wandb.finish()
 
     def log_label_ratio(self, dataset, name):
         labels = []
-        indices = random.sample(range(len(dataset)), 300)
+        to_sample = min(300, len(dataset))
+        indices = random.sample(range(len(dataset)), to_sample)
         for i in indices:
             labels.append(dataset.get_label(i))
         

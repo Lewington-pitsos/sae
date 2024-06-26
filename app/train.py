@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from app.models import build_model
 from app.constants import *
-from app.load import load_imdb
+from app.load import load_ds
 from app.logging import MetricsLogger
 
 def train(metrics: MetricsLogger, model, train_dataset, test_dataset, lr, epochs, batch_size, device=DEVICE):
@@ -75,16 +75,18 @@ def run(params):
         raise ValueError("If you want to skip training, you should also skip wandb logging")
     
     _set_seed()
-    metrics = MetricsLogger(model_name=params['model_name'], skip_wandb=params['skip_wandb'])
+    metrics = MetricsLogger(model_type=params['model_type'], skip_wandb=params['skip_wandb'])
 
     metrics.init(project="imdb-gpt2-classification", config=params.copy())
 
-    train_dataset, test_dataset = load_imdb(dataset_name=params['dataset_name'], max_seq_len=params['max_seq_len'], model_name=params['model_name'])
+    train_dataset, test_dataset = load_ds(dataset_name=params['dataset_name'], max_seq_len=params['max_seq_len'], model_type=params['model_type'])
     metrics.log_label_ratio(train_dataset, 'train')
     metrics.log_label_ratio(test_dataset, 'test')
 
     model = build_model(
-        params['model_name'], 
+        params['model_type'], 
+        model_size=params['model_size'],
+        dataset_name=params['dataset_name'],
         hidden_size=params['hidden_size'], 
         freeze=params['freeze'], 
         max_seq_len=params['max_seq_len'], 
@@ -96,6 +98,12 @@ def run(params):
         print('skipping the actual training')
         metrics.finalize()
         return
+
+    if 'dry_run' in params and params['dry_run']:
+        # filter the training dataset down to the first 10 items
+        train_dataset.tokenized_dataset = train_dataset.tokenized_dataset[:10]
+        test_dataset.tokenized_dataset = test_dataset.tokenized_dataset[:10]
+
 
     train(metrics, model, train_dataset, test_dataset, batch_size=params['batch_size'], epochs=params['epochs'], lr=params['lr'], device=DEVICE)
 

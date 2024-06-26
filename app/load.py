@@ -1,5 +1,4 @@
 import os
-
 from torch.utils.data import DataLoader, Dataset
 import torch
 from datasets import load_dataset, load_from_disk
@@ -12,29 +11,38 @@ class IMDBDataset(Dataset):
     def __init__(self, tokenized_dataset):
         self.tokenized_dataset = tokenized_dataset
 
+        first = tokenized_dataset[0]
+
+        if 'Label' in first:
+            self.label_column = 'Label'
+        elif 'label' in first:
+            self.label_column = 'label' 
+        else:
+            raise ValueError("No label column found", first)
+
     def __len__(self):
         return len(self.tokenized_dataset)
 
     def get_label(self, idx):
-        return self.tokenized_dataset[idx]['label']
+        return self.tokenized_dataset[idx][self.label_column]
 
     def __getitem__(self, idx):
         item = self.tokenized_dataset[idx]
         input_ids = torch.tensor(item['input_ids'])
         attention_mask = torch.tensor(item['attention_mask'])
-        label = torch.tensor(item['label'])
+        label = torch.tensor(item[self.label_column])
 
         return input_ids, attention_mask, label
 
-def load_imdb(dataset_name, max_seq_len, model_name) -> IMDBDataset:
-    local_file = os.path.join(LOCAL_DATA_PATH, f'imdb-{max_seq_len}-{model_name}.pt')
+def load_ds(dataset_name, max_seq_len, model_type) -> IMDBDataset:
+    local_file = os.path.join(LOCAL_DATA_PATH, f'imdb-{max_seq_len}-{model_type}.pt')
 
     if os.path.exists(local_file):
         print(f"Loading dataset from {local_file}")
         dataset = torch.load(local_file)
     else:
         print("Building dataset...")
-        tokenizer = load_tokenizer(model_name)
+        tokenizer = load_tokenizer(model_type)
         dataset = smart_load_dataset(dataset_name)
 
         if 'unsupervised' in dataset:
@@ -47,14 +55,14 @@ def load_imdb(dataset_name, max_seq_len, model_name) -> IMDBDataset:
 
         dataset = dataset.map(tokenize_function, batched=True)
 
-        dataset_dict = {'train': list(dataset['train']), 'test': list(dataset['test'])}     
+        dataset = {'train': list(dataset['train']), 'test': list(dataset['test'])}     
         
         os.makedirs(os.path.dirname(local_file), exist_ok=True)
-        torch.save(dataset_dict, local_file)
+        torch.save(dataset, local_file)
         print(f"Dataset saved to {local_file}")
 
-    train_dataset = IMDBDataset(dataset_dict['train'])
-    test_dataset = IMDBDataset(dataset_dict['test'])
+    train_dataset = IMDBDataset(dataset['train'])
+    test_dataset = IMDBDataset(dataset['test'])
 
     return train_dataset, test_dataset
 
@@ -64,4 +72,4 @@ def smart_load_dataset(name):
     return load_dataset(name)
 
 def get_text_column(dataset):
-    return list(set(dataset['train'].column_names) - set(NON_TEXT_COLUMNS))[0]
+    return list(set(dataset['train'].column_names) - set(NON_TEXT_COLUMNS + ['label']))[0]

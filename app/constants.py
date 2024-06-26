@@ -40,3 +40,5 @@ RAFT_DATASETS = [
     'overruling',
     'banking_77'
 ]
+
+ALL_DATASETS = ['imdb'] + RAFT_DATASETS

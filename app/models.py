@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch
-from transformers import GPT2Model, GPT2ForSequenceClassification, PretrainedConfig, AutoConfig
+from transformers import GPT2Model, GPT2ForSequenceClassification, PretrainedConfig, AutoConfig, GPT2Tokenizer, GPT2LMHeadModel
 from sae_lens import SAE
 from transformer_lens import HookedTransformer
 
@@ -21,27 +21,79 @@ class SimpleGPT2SequenceClassifier(nn.Module):
         linear_output = self.fc1(gpt_out.view(batch_size, -1))
         return linear_output
 
-# def classify_sentiment(model, batch):
-#     with torch.no_grad():
-#         outputs = model(input_ids=batch)
-#     logits = outputs.logits[:, -1, :]
-#     probabilities = softmax(logits, dim=-1)
-#     probabilities = probabilities[:, TOKENIZED_LABELS]
-#     predicted_idxs = torch.argmax(probabilities, dim=-1)
-#     predicted_sentiments = [LABELS[idx.item()] for idx in predicted_idxs]
-#     return predicted_sentiments
 
-# def classify_sentiment_generate(model, batch):
-#     outputs = model.generate(input_ids=batch, max_length=batch.shape[1] + 1, num_return_sequences=1)
-#     decoded_outputs = [tokenizer.decode(output) for output in outputs]
-#     predicted_sentiments = []
-#     for decoded_output in decoded_outputs:
-#         last_word = decoded_output.split()[-1].lower()
-#         if last_word in LABELS:
-#             predicted_sentiments.append(last_word)
-#         else:
-#             predicted_sentiments.append(classify_sentiment_random(model, [decoded_output])[0])
-#     return predicted_sentiments
+def inject_phrase(input_ids, phrase, pad_token, attention_mask, device):
+    phrase_length = phrase.size(0)
+    seq_len = input_ids.size(1)
+
+    new_seq_length = seq_len + phrase_length
+    new_input_ids = torch.full((input_ids.size(0), new_seq_length), pad_token, dtype=input_ids.dtype).to(device)
+    new_input_ids[:, :seq_len] = input_ids
+
+    batch_padding_counts = torch.sum(attention_mask, dim=1)
+
+    stop_indices = batch_padding_counts + phrase_length
+
+    range_tensor = torch.arange(new_input_ids.size(1)).expand(new_input_ids.size(0), -1).to(device)
+
+    mask = (range_tensor >= batch_padding_counts.unsqueeze(1)) & (range_tensor < stop_indices.unsqueeze(1))
+
+    new_input_ids[mask] = torch.concat([phrase] * new_input_ids.size(0)).to(device).to(torch.int64)
+
+    new_batch_padding_counts = batch_padding_counts + phrase_length
+    new_attention_mask = torch.full((attention_mask.size(0), new_seq_length), 0, dtype=attention_mask.dtype).to(device)
+
+    mask = (range_tensor < new_batch_padding_counts.unsqueeze(1))
+    new_attention_mask[mask] = 1
+
+    return new_input_ids, new_attention_mask
+
+class GPTProbabilityClassifier(nn.Module):
+    def __init__(self, model_size, phrase, labels, device, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        self.labels = labels
+
+        self.model = GPT2LMHeadModel.from_pretrained(model_size)
+        self.classification_phrase = phrase
+
+        tokenizer = GPT2Tokenizer.from_pretrained(model_size)
+        tokenizer.pad_token = tokenizer.eos_token
+        self.pad_token_id = tokenizer.eos_token_id
+        self.tokenized_labels = []
+
+        for l in self.labels:
+            input_ids = tokenizer(l, return_tensors='pt', padding=True, truncation=True)['input_ids'].view(-1)
+            input_ids.required_grad=False
+            self.tokenized_labels.append(input_ids)
+
+        self.tokenized_classification_phrase = tokenizer(phrase, return_tensors='pt', padding=True, truncation=True)['input_ids'][0]
+        self.classification_phrase_length = self.tokenized_classification_phrase.shape[0]
+        self.device = device
+
+        self.softmax = nn.Softmax(dim=1)    
+
+    def forward(self, input_ids, attention_mask):
+        probabilities = []
+
+        for l in self.tokenized_labels:
+            class_input_ids, class_attention_mask = inject_phrase(input_ids, torch.concat([self.tokenized_classification_phrase, l]), self.pad_token_id, attention_mask, self.device)
+            outputs = self.model(input_ids=class_input_ids, attention_mask=class_attention_mask)
+            log_probs = torch.nn.functional.log_softmax(outputs.logits, dim=-1)
+
+            shifted_input_ids = class_input_ids[:, 1:]
+            shifted_log_probs = log_probs[:, :-1, :]
+
+            log_likelihood = torch.gather(shifted_log_probs, 2, shifted_input_ids.unsqueeze(-1)).squeeze(-1)
+
+            total_log_likelihood = log_likelihood.mean(dim=1)
+            probabilities.append(total_log_likelihood)
+
+
+        probabilities = torch.stack(probabilities, dim=1)
+
+        return probabilities
+
 
 class RandomClassifier(torch.nn.Module):
     def __init__(self):
@@ -147,6 +199,7 @@ class SAEFeaturesModel(SAEBaseModel):
 
         features = self.sae.encode(hidden_states)
         return features
+
 class SAEClassifier(SAEBaseModel):
     def forward(self, input_ids, attention_mask):
         _, cache = self.model.run_with_cache(input_ids, attention_mask=attention_mask, prepend_bos=True, stop_at_layer=self.hook_layer + 1)
@@ -199,21 +252,47 @@ def get_sae_model_config(model_name):
     
     raise ValueError(f"Invalid model name: {model_name}")
 
-def build_model(model_name, hidden_size, max_seq_len, freeze, device):
-    if model_name == 'simple':
+def get_probability_model_config(dataset_name):
+    if dataset_name == 'imdb': 
+        return {
+            'labels': ['negative', 'positive'],
+            'phrase': ''
+        }
+    elif dataset_name == 'data/raft_ade_corpus_v2':
+        return {
+            'labels': ['no adverse drug event', 'adverse drug event',],
+            'phrase': '\n\n the preceding sentence would be classified (adverse drug event|no adverse drug event) as '
+        }
+    elif dataset_name == 'data/raft_overruling':
+        return {
+            'labels': ['not overruling', 'overruling'],
+            'phrase': '\n\n the preceding legal text would be considered (overruling|not overruling) an '
+        }
+    elif dataset_name == 'data/raft_tweet_eval_hate':
+        return {
+            'labels': ['not hateful', 'hateful'],
+            'phrase': '\n\n classification:  '
+        }
+
+    raise ValueError(f"Invalid dataset name: {dataset_name}")
+
+def build_model(model_type, model_size, dataset_name, hidden_size, max_seq_len, freeze, device):
+    if model_type == 'simple':
         return SimpleGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=max_seq_len, gpt_model_name='gpt2', freeze=freeze)
-    elif model_name == 'big-head':
+    elif model_type == 'probability':
+        return GPTProbabilityClassifier(model_size=model_size, **get_probability_model_config(dataset_name), device=device)
+    elif model_type == 'big-head':
         return BigHeadGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=max_seq_len, gpt_model_name='gpt2', freeze=freeze)
-    elif model_name == 'sae-classifier-gpt2':
-        return SAEClassifier(device=device, max_seq_len=max_seq_len, **get_sae_model_config(model_name))
-    elif model_name == 'sae-classifier-mistral7b':
-        return SAEClassifier(device=device, max_seq_len=max_seq_len, **get_sae_model_config(model_name))
-    elif model_name == 'random':
+    elif model_type == 'sae-classifier-gpt':
+        return SAEClassifier(device=device, max_seq_len=max_seq_len, **get_sae_model_config(model_type))
+    elif model_type == 'sae-classifier-mistral7b':
+        return SAEClassifier(device=device, max_seq_len=max_seq_len, **get_sae_model_config(model_type))
+    elif model_type == 'random':
         return RandomClassifier()
-    elif model_name == 'gpt2-classifier': 
+    elif model_type == 'gpt2-classifier': 
         return GPT2Classifier('gpt2').to(device)
         
-    raise ValueError(f"Invalid model name: {model_name}")
+    raise ValueError(f"Invalid model type: {model_type}")
 
 
 def masked_avg(embedding_matrix, attention_mask):

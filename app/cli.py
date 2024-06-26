@@ -3,6 +3,7 @@ from app.store import S3Store
 from app.constants import *
 from app.train import run_all
 from app.rp import *
+from app.build_params import build
 
 def handle_store(args):
     print('\n(￣个￣)\nstoremaster at your service!\n')
@@ -50,6 +51,11 @@ def handle_runpod(args):
 
     print("\n°˖✧◝(⁰▿⁰)◜✧˖°\n")
 
+def handle_build_params(args):
+    build()
+
+    print("\n/ᐠ-ꞈ-ᐟ\ \nparams built nyan\n")
+
 def main():
     parser = argparse.ArgumentParser(description='CLI for various tools.')
     
@@ -70,6 +76,12 @@ def main():
     parser_runpod = subparsers.add_parser('runpod', help='Create a Runpod')
     parser_runpod.add_argument('action', choices=['deploy', 'purge', 'show'], help='Action to perform')
     parser_runpod.set_defaults(func=handle_runpod)
+
+    # build paramaters tool
+    parser_build_params = subparsers.add_parser('params', help='Build parameters for training')
+    parser_build_params.set_defaults(func=handle_build_params)
+
+
 
     args = parser.parse_args()
     args.func(args)

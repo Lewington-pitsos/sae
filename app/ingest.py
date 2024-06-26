@@ -145,7 +145,7 @@ def ingest_raft(raft_subset_name):
 def ingest_and_save_raft(raft_subset_name):
     labelled_dataset = ingest_raft(raft_subset_name)
 
-    labelled_dataset.save_to_disk(f'cruft/raft_{raft_subset_name}')
+    labelled_dataset.save_to_disk(f'data/raft_{raft_subset_name}')
 
 
 RAFT_PARAMS = {
