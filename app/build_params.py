@@ -20,7 +20,7 @@ def build():
     }
 
     all_params = []
-    for dataset_name in ALL_DATASETS:
+    for dataset_name in COMPILED_DATASETS:
         clone = default.copy()
         clone['dataset_name'] = dataset_name
         all_params.append(clone)
