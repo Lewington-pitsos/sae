@@ -70,14 +70,20 @@ def _set_seed():
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
-def run(params):
+def run(params, project):
     if ('skip_training' in params and params['skip_training']) and not params['skip_wandb']:
         raise ValueError("If you want to skip training, you should also skip wandb logging")
     
+    if not project and not params['skip_wandb']:
+        raise ValueError("You need to provide a project name unless you are skipping wandb logging")
+
     _set_seed()
     metrics = MetricsLogger(model_type=params['model_type'], skip_wandb=params['skip_wandb'])
 
-    metrics.init(project="imdb-gpt2-classification", config=params.copy())
+
+
+    print('run in project', project)
+    metrics.init(project=project, config=params.copy())
 
     train_dataset, test_dataset = load_ds(dataset_name=params['dataset_name'], max_seq_len=params['max_seq_len'], model_type=params['model_type'])
     metrics.log_label_ratio(train_dataset, 'train')
@@ -107,10 +113,10 @@ def run(params):
 
     train(metrics, model, train_dataset, test_dataset, batch_size=params['batch_size'], epochs=params['epochs'], lr=params['lr'], device=DEVICE)
 
-def run_all():
+def run_all(project='imdb-gpt2-classification'):
     with open('.params.json') as f:
         runs = json.load(f)
 
     for r in runs:
         print("Starting new run...")
-        run(r)
+        run(r, project)

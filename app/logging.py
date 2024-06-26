@@ -25,8 +25,9 @@ class MetricsLogger():
         self.start = time.time()
 
     def init(self, *args, **kwargs):
+        
         if not self.skip_wandb:
-            wandb.init(*args, **kwargs, reinit=True)
+            wandb.init(reinit=True, *args, **kwargs)
 
     def step_epoch(self):
         avg_train_loss = sum(self.train_losses) / len(self.train_losses)

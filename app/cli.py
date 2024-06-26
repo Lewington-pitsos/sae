@@ -34,7 +34,7 @@ def handle_store(args):
 def handle_train(args):
     print('\n┏ʕ •ᴥ•ʔ┛\ntime to train\n')
     
-    run_all()
+    run_all(args.project)
 
     print('\nʕノ•ᴥ•ʔノ\ntraining complete\n')
 
@@ -56,7 +56,7 @@ def handle_runpod(args):
 def handle_build_params(args):
     build()
 
-    print("\n/ᐠ-ꞈ-ᐟ\ \nparams built nyan\n")
+    print("\n/ᐠ-ꞈ-ᐟ\\nnyan\n")
 
 def main():
     parser = argparse.ArgumentParser(description='CLI for various tools.')
@@ -72,6 +72,7 @@ def main():
 
     # Train tool
     parser_train = subparsers.add_parser('train', help='Train the IMDB model')
+    parser_train.add_argument('--project', type=str, help='Wandb project name', default='')
     parser_train.set_defaults(func=handle_train)
 
     # Runpod tool
@@ -82,8 +83,6 @@ def main():
     # build paramaters tool
     parser_build_params = subparsers.add_parser('params', help='Build parameters for training')
     parser_build_params.set_defaults(func=handle_build_params)
-
-
 
     args = parser.parse_args()
     args.func(args)

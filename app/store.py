@@ -26,10 +26,6 @@ class S3Store:
         self.s3.download_file(self.bucket_name, remote_file, file_path)
 
     def overwrite_remote(self, path):
-        # delete all existing remote files under this path
-        # and upload the local files, or create the directory if it doesn't exist
-
-        
         paginator = self.s3.get_paginator('list_objects_v2')
         remote_path = path.replace(self.local_dir + '/', "").lstrip('/')
         for page in paginator.paginate(Bucket=self.bucket_name, Prefix=remote_path):
