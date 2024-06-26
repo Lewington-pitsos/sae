@@ -109,9 +109,15 @@ def ingest_raft(raft_subset_name):
     return raft
 
 def ingest_and_save_raft(raft_subset_name):
-    labelled_dataset = ingest_raft(raft_subset_name)
+    raft_name = f'data/raft_{raft_subset_name}'
+    if os.path.exists(raft_name):
+        print(f"dataset {raft_subset_name} already exists")
+        return
 
-    labelled_dataset.save_to_disk(f'data/raft_{raft_subset_name}')
+    print(f"downloading dataset {raft_subset_name}...")
+
+    labelled_dataset = ingest_raft(raft_subset_name)
+    labelled_dataset.save_to_disk(raft_name)
 
 
 RAFT_PARAMS = {

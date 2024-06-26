@@ -1,4 +1,3 @@
-import os
 import random
 import numpy as np
 import torch
@@ -11,6 +10,7 @@ from app.models import build_model
 from app.constants import *
 from app.load import load_ds
 from app.logging import MetricsLogger
+from app.ingest import ingest_and_save_raft
 
 def train(metrics: MetricsLogger, model, train_dataset, test_dataset, lr, epochs, batch_size, device=DEVICE):
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -118,6 +118,15 @@ def run(params, project):
 def run_all(project='imdb-gpt2-classification', param_file='.params.json'):
     with open(param_file) as f:
         runs = json.load(f)
+
+    datasets = set()
+
+    for r in runs:
+        datasets.add(r['dataset_name'])
+
+    for dataset in datasets:
+        if dataset in RAFT_DATASETS:
+            ingest_and_save_raft(dataset)
 
     for r in runs:
         print("Starting new run...")

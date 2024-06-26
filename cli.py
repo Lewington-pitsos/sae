@@ -1,9 +1,5 @@
 import argparse
-from app.store import S3Store
-from app.constants import *
-from app.train import run_all
-from app.rp import *
-from app.build_params import build
+from app import S3Store, run_all, deploy_pod, destroy_all_pods, show_pods, build, LOCAL_DATA_PATH
 
 def handle_store(args):
     print('\n(￣个￣)\nstoremaster at your service!\n')
@@ -71,18 +67,18 @@ def main():
     parser_store.set_defaults(func=handle_store)
 
     # Train tool
-    parser_train = subparsers.add_parser('train', help='Train the IMDB model')
+    parser_train = subparsers.add_parser('train', help='Train models')
     parser_train.add_argument('--params', type=str, help='Path to the parameters file', default='.params.json')
     parser_train.add_argument('--project', type=str, help='Wandb project name', default='')
     parser_train.set_defaults(func=handle_train)
 
     # Runpod tool
-    parser_runpod = subparsers.add_parser('runpod', help='Create a Runpod')
+    parser_runpod = subparsers.add_parser('runpod', help='Deplot a Runpod instance for cheap training')
     parser_runpod.add_argument('action', choices=['deploy', 'purge', 'show'], help='Action to perform')
     parser_runpod.set_defaults(func=handle_runpod)
 
     # build paramaters tool
-    parser_build_params = subparsers.add_parser('params', help='Build parameters for training')
+    parser_build_params = subparsers.add_parser('params', help='Build parameters which defined the different training runs you want to run.')
     parser_build_params.set_defaults(func=handle_build_params)
 
     args = parser.parse_args()
