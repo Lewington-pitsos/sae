@@ -2,12 +2,24 @@ import wandb
 import torch
 import time
 
-from transformers import GPT2Tokenizer
-
 import random
-from app.viz import log_model_parameters_info
+import torch.nn as nn
 from app.tok import load_tokenizer
 from sklearn.metrics import f1_score
+
+def log_model_parameters_info(model: nn.Module, skip_wandb: bool = False):
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    non_trainable_params = total_params - trainable_params
+    ratio = trainable_params / non_trainable_params if non_trainable_params != 0 else float('inf')
+
+    print(f"Total parameters: {total_params:,} (roughly {total_params:.2e})")
+    print(f"Trainable parameters: {trainable_params:,} (roughly {trainable_params:.2e})")
+    print(f"Non-trainable parameters: {non_trainable_params:,} (roughly {non_trainable_params:.2e})")
+    print(f"Ratio (Trainable/Non-trainable): {ratio:,} (roughly {ratio:.2e})")
+
+    if not skip_wandb:
+        wandb.log({"total_parameters": total_params, "trainable_parameters": trainable_params, "non_trainable_parameters": non_trainable_params, "trainable_parameter_ratio": ratio})
 
 class MetricsLogger():
     def __init__(self, model_type, skip_wandb=False):
@@ -103,3 +115,5 @@ class MetricsLogger():
 
     def log_model_params(self, model):
         log_model_parameters_info(model, self.skip_wandb)
+
+
