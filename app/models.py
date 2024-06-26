@@ -110,52 +110,6 @@ class RandomClassifier(torch.nn.Module):
         x = self.fc1(one_hot_tensor)
         return x
 
-def save_tensor_activations(tensor, file_prefix='activation'):
-    import matplotlib.pyplot as plt
-    # Check the shape of the tensor
-    if tensor.ndim != 3 or tensor.shape[0] != 2:
-        raise ValueError("Tensor must be of shape [2, 50, 768]")
-    
-    for i in range(tensor.shape[0]):
-        activation = tensor[i].detach().numpy()  # Convert to numpy array
-        plt.imshow(activation, aspect='auto', cmap='viridis')
-        plt.colorbar()
-        plt.title(f'Activation {i+1}')
-        plt.xlabel('Features')
-        plt.ylabel('Activation Index')
-        plt.savefig(f'{file_prefix}_{i+1}.png')
-        plt.close()
-
-class BigHeadGPT2SequenceClassifier(nn.Module):
-    def __init__(self, 
-            hidden_size: int, 
-            max_seq_len: int, 
-            gpt_model_name: str, 
-            num_classes: int = 2, 
-            freeze=False, 
-        ):
-        super(BigHeadGPT2SequenceClassifier, self).__init__()
-        self.gpt2model = GPT2Model.from_pretrained(gpt_model_name)
-        if freeze:
-            for param in self.gpt2model.parameters():
-                param.requires_grad = False
-        head_hidden_size = 8192
-        self.fc1 = nn.Linear(hidden_size, head_hidden_size)
-        self.activation = nn.ReLU()
-        self.fc2 = nn.Linear(head_hidden_size * max_seq_len, num_classes, bias=False)
-
-    def forward(self, input_ids, attention_mask):
-        gpt_out = self.gpt2model(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
-
-        x = self.fc1(gpt_out)
-        x = self.activation(x)
-        x = x.view(x.shape[0], -1)
-        x = self.fc2(x)
-
-        return x
-
-
-
 class SAEBaseModel(nn.Module):
     def __init__(self, 
                  transformer_name: str, 
@@ -281,8 +235,6 @@ def build_model(model_type, model_size, dataset_name, hidden_size, max_seq_len, 
         return SimpleGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=max_seq_len, gpt_model_name='gpt2', freeze=freeze)
     elif model_type == 'probability':
         return GPTProbabilityClassifier(model_size=model_size, **get_probability_model_config(dataset_name), device=device)
-    elif model_type == 'big-head':
-        return BigHeadGPT2SequenceClassifier(hidden_size=hidden_size, max_seq_len=max_seq_len, gpt_model_name='gpt2', freeze=freeze)
     elif model_type == 'sae-classifier-gpt':
         return SAEClassifier(device=device, max_seq_len=max_seq_len, **get_sae_model_config(model_type))
     elif model_type == 'sae-classifier-mistral7b':
@@ -293,7 +245,6 @@ def build_model(model_type, model_size, dataset_name, hidden_size, max_seq_len, 
         return GPT2Classifier('gpt2').to(device)
         
     raise ValueError(f"Invalid model type: {model_type}")
-
 
 def masked_avg(embedding_matrix, attention_mask):
     attention_mask_expanded = attention_mask.unsqueeze(-1)

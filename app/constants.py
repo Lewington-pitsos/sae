@@ -40,5 +40,3 @@ RAFT_DATASETS = [
     'overruling',
     'banking_77'
 ]
-
-COMPILED_DATASETS = ['imdb'] + [f'{LOCAL_DATA_PATH}/raft_' + f for f in RAFT_DATASETS]

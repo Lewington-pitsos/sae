@@ -2,6 +2,9 @@ import json
 
 from app.constants import *
 
+COMPILED_DATASETS = ['imdb'] + [f'{LOCAL_DATA_PATH}/raft_' + f for f in RAFT_DATASETS if f != 'banking_77']
+
+
 def build():
     default = {
         "batch_size": 32,

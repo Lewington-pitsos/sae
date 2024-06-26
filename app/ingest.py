@@ -3,46 +3,6 @@ from datasets import load_dataset
 from app.constants import *
 from app.load import get_text_column
 
-todo = {
-    # 'neurips_impact_statement_risks': None, < ---------- no labels
-    'tweet_eval_hate': 'cardiffnlp/tweet_eval', # 'hate'
-    # 'overruling',
-    # 'semiconductor_org_types', <--------- no labels
-    # 'tai_safety_research', < ------- compiled by RAFT from public sources, big effort
-    # 'terms_of_service', < ------ need to compile from claudette
-    # 'twitter_complaints', < ---------
-}
-
-def levenshtein_distance(s1, s2):
-    # Initialize the matrix
-    d = [[0 for _ in range(len(s2) + 1)] for _ in range(len(s1) + 1)]
-
-    # Fill the first row and first column
-    for i in range(len(s1) + 1):
-        d[i][0] = i
-    for j in range(len(s2) + 1):
-        d[0][j] = j
-
-    # Compute the Levenshtein distance
-    for i in range(1, len(s1) + 1):
-        for j in range(1, len(s2) + 1):
-            if s1[i - 1] == s2[j - 1]:
-                cost = 0
-            else:
-                cost = 1
-            d[i][j] = min(d[i - 1][j] + 1,    # Deletion
-                          d[i][j - 1] + 1,    # Insertion
-                          d[i - 1][j - 1] + cost)  # Substitution
-
-    return d[-1][-1]
-
-def string_similarity(s1, s2):
-    distance = levenshtein_distance(s1, s2)
-    max_len = max(len(s1), len(s2))
-    similarity = (max_len - distance) / max_len
-    return similarity
-
-
 def validate_new_dataset(ds, expected_test_len):
     for split in ['train', 'test']:
         all_labels = set()
@@ -50,7 +10,8 @@ def validate_new_dataset(ds, expected_test_len):
             all_labels.add(row['Label'])
         print(f'number of labels in {split}:', len(all_labels))
     
-    assert len(ds['train']) == 50, f"train size {len(ds['train'])}"
+    # 48 when we remove the 2 ambiguously labelled tweet_eval_hate examples
+    assert len(ds['train']) in [50, 48], f"train size {len(ds['train'])}"
     assert len(ds['test']) == expected_test_len, f"test size {len(ds['test'])}"
 
 def ingest_raft(raft_subset_name):
@@ -99,18 +60,23 @@ def ingest_raft(raft_subset_name):
 
     raft = load_dataset("ought/raft", raft_subset_name, cache_dir="cache")
     raft_text_name = get_text_column(raft)
+    if len(mis_labelled) > 0:
+        print('filtering out mislabelled instances')
+        raft = raft.filter(lambda x: x[raft_text_name] not in mis_labelled)
+
     def add_matching_label(example):
         text = example[raft_text_name]
         
         try:
             label_for_text = text_dict[text]
         except KeyError:
-            # strip whitespace from beginning of text and try again
-            try: 
-                label_for_text = text_dict[" " + text]
-            except KeyError:
-                label_for_text = text_dict["  " + text]
-        
+            for variation in [" ", "  "]:
+                if variation + text in text_dict:
+                    label_for_text = text_dict[variation + text]
+                    break
+                else:
+                    raise ValueError(f"could not find label for text: {text}")
+
         raft_label = label_mapping[label_for_text]
         
         new_raft_label = raft['train'].features['Label'].str2int(raft_label) - 1
@@ -162,5 +128,6 @@ RAFT_PARAMS = {
 }
 
 if __name__ == '__main__':
-    for dataset_name in RAFT_DATASETS:
-        ingest_and_save_raft(dataset_name)
+    ingest_and_save_raft('tweet_eval_hate')
+    # for dataset_name in RAFT_DATASETS:
+        # ingest_and_save_raft(dataset_name)
