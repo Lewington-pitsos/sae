@@ -12,9 +12,19 @@ from app.load import load_ds
 from app.logging import MetricsLogger
 from app.ingest import ingest_and_save_raft
 
-def train(metrics: MetricsLogger, model, train_dataset, test_dataset, lr, epochs, batch_size, device=DEVICE):
+def train(
+        metrics: MetricsLogger, 
+        model, train_dataset, 
+        test_dataset, 
+        lr, 
+        epochs, 
+        batch_size, 
+        test_batch_size,
+        test_every=1,  
+        device=DEVICE
+    ):
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size)
+    test_loader = DataLoader(test_dataset, batch_size=test_batch_size)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -44,21 +54,22 @@ def train(metrics: MetricsLogger, model, train_dataset, test_dataset, lr, epochs
                 lr=scheduler.get_last_lr()[0]
             )
 
-        model.eval()
-        with torch.no_grad():
-            for batch_idx, (input_ids, attention_mask, labels) in tqdm(enumerate(test_loader)):
-                input_ids, attention_mask, labels = input_ids.to(device), attention_mask.to(device), labels.to(device)
-                
-                outputs = model(input_ids=input_ids, attention_mask=attention_mask)
-                loss = criterion(outputs, labels)
+        if epoch % test_every == 0 or epoch == epochs - 1:
+            model.eval()
+            with torch.no_grad():
+                for batch_idx, (input_ids, attention_mask, labels) in tqdm(enumerate(test_loader)):
+                    input_ids, attention_mask, labels = input_ids.to(device), attention_mask.to(device), labels.to(device)
+                    
+                    outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+                    loss = criterion(outputs, labels)
 
-                metrics.log_test_batch(
-                    batch_idx=batch_idx,
-                    loss=loss.item(),
-                    labels=labels,
-                    outputs=outputs,
-                    input_ids=input_ids,
-                )
+                    metrics.log_test_batch(
+                        batch_idx=batch_idx,
+                        loss=loss.item(),
+                        labels=labels,
+                        outputs=outputs,
+                        input_ids=input_ids,
+                    )
 
         scheduler.step()
         metrics.step_epoch()
@@ -81,9 +92,9 @@ def run(params, project):
         raise ValueError("You need to provide a project name unless you are skipping wandb logging")
 
     _set_seed()
-    metrics = MetricsLogger(model_type=params['model_type'], skip_wandb=params['skip_wandb'])
 
-
+    name = f"{params['model_type']}_{params['dataset_name'].split('/')[-1]}"
+    metrics = MetricsLogger(model_type=params['model_type'], skip_wandb=params['skip_wandb'], name=name)
 
     print('run in project', project)
     metrics.init(project=project, config=params.copy())
@@ -99,6 +110,9 @@ def run(params, project):
         freeze=params['freeze'], 
         max_seq_len=params['max_seq_len'],
         activation=params['activation'], 
+        dropout=params['dropout'],
+        hidden_size=params['hidden_size'],
+        second_attention_mask=params['second_attention_mask'],
         device=DEVICE,
     )
     metrics.log_model_params(model)
@@ -114,7 +128,18 @@ def run(params, project):
         test_dataset = torch.utils.data.Subset(test_dataset, torch.randperm(len(test_dataset))[:10])
 
 
-    train(metrics, model, train_dataset, test_dataset, batch_size=params['batch_size'], epochs=params['epochs'], lr=params['lr'], device=DEVICE)
+    train(
+        metrics, 
+        model, 
+        train_dataset, 
+        test_dataset, 
+        batch_size=params['batch_size'],
+        test_batch_size=params['test_batch_size'] if 'test_batch_size' in params else params['batch_size'], 
+        epochs=params['epochs'], 
+        lr=params['lr'],
+        test_every=params['test_every'], 
+        device=DEVICE
+    )
 
 def run_all(project='imdb-gpt2-classification', param_file='.params.json'):
     with open(param_file) as f:

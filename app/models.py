@@ -7,10 +7,11 @@ from transformer_lens import HookedTransformer
 from app.constants import *
 
 class SimpleGPT2SequenceClassifier(nn.Module):
-    def __init__(self, model_size:str, max_seq_len: int, num_classes: int = 2):
+    def __init__(self, model_size:str, max_seq_len: int, second_attention_mask:bool, num_classes: int = 2):
         super(SimpleGPT2SequenceClassifier, self).__init__()
         self.gpt2model = GPT2Model.from_pretrained(model_size)
         final_hidden_size = self.gpt2model.config.n_embd
+        self.second_attention_mask = second_attention_mask
 
         for param in self.gpt2model.parameters():
             param.requires_grad = False
@@ -19,6 +20,10 @@ class SimpleGPT2SequenceClassifier(nn.Module):
     def forward(self, input_ids, attention_mask):
         gpt_out = self.gpt2model(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
         batch_size = gpt_out.shape[0]
+
+        if self.second_attention_mask:
+            gpt_out = gpt_out * attention_mask.unsqueeze(-1)
+
         linear_output = self.fc1(gpt_out.view(batch_size, -1))
         return linear_output
 
@@ -29,11 +34,14 @@ class BigHeadGPT2SequenceClassifier(nn.Module):
             max_seq_len: int, 
             num_classes: int = 2, 
             activation: str = 'relu',
-            head_hidden_size: int = 8192
+            head_hidden_size: int = 2048,
+            second_attention_mask: bool = False,
+            dropout=None,
         ):
         super(BigHeadGPT2SequenceClassifier, self).__init__()
         self.gpt2model = GPT2Model.from_pretrained(model_size)
         hidden_size = self.gpt2model.config.n_embd
+        self.second_attention_mask = second_attention_mask
 
         for param in self.gpt2model.parameters():
             param.requires_grad = False
@@ -43,6 +51,12 @@ class BigHeadGPT2SequenceClassifier(nn.Module):
         self.activation = self._get_activation(activation)
 
         self.fc2 = nn.Linear(head_hidden_size * max_seq_len, num_classes, bias=False)
+
+        if not dropout:
+            # dropout is a noop
+            self.dropout = lambda x: x
+        else:
+            self.dropout = nn.Dropout(dropout)
 
     def _get_activation(self, activation):
         if activation == 'relu':
@@ -57,9 +71,14 @@ class BigHeadGPT2SequenceClassifier(nn.Module):
     def forward(self, input_ids, attention_mask):
         gpt_out = self.gpt2model(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
 
+
+        if self.second_attention_mask:
+            gpt_out = gpt_out * attention_mask.unsqueeze(-1)
+
         x = self.fc1(gpt_out)
         x = self.activation(x)
         x = x.view(x.shape[0], -1)
+        x = self.dropout(x)
         x = self.fc2(x)
 
         return x
@@ -200,20 +219,27 @@ class SAEBaseModel(nn.Module):
 
 class SAEFeaturesModel(SAEBaseModel):
     def forward(self, input_ids, attention_mask):
-        _, cache = self.model.run_with_cache(input_ids, attention_mask=attention_mask, prepend_bos=True, stop_at_layer=self.hook_layer + 1)
+        _, cache = self.model.run_with_cache(input_ids, attention_mask=attention_mask, prepend_bos=True)
 
         hidden_states = cache[self.hook_name]
-
+        final_hidden_states = cache['ln_final.hook_normalized']
         features = self.sae.encode(hidden_states)
-        return features
+        return features, hidden_states, final_hidden_states
 
 class SAEClassifier(SAEBaseModel):
+    def __init__(self, second_attention_mask, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.second_attention_mask = second_attention_mask
+
     def forward(self, input_ids, attention_mask):
         _, cache = self.model.run_with_cache(input_ids, attention_mask=attention_mask, prepend_bos=True, stop_at_layer=self.hook_layer + 1)
 
         hidden_states = cache[self.hook_name]
 
         features = self.sae.encode(hidden_states)
+
+        if self.second_attention_mask:
+            features = features * attention_mask.unsqueeze(-1)
 
         features = features.transpose(1, 2)
 
@@ -283,17 +309,27 @@ def get_probability_model_config(dataset_name):
 
     raise ValueError(f"Invalid dataset name: {dataset_name}")
 
-def build_model(model_type, model_size, dataset_name, max_seq_len, freeze, activation, device):
+def build_model(
+        model_type, 
+        model_size, 
+        dataset_name, 
+        max_seq_len, 
+        freeze, 
+        activation, 
+        dropout, 
+        hidden_size,
+        second_attention_mask,  
+        device):
     if model_type == 'simple':
-        return SimpleGPT2SequenceClassifier(model_size=model_size, max_seq_len=max_seq_len)
+        return SimpleGPT2SequenceClassifier(model_size=model_size, max_seq_len=max_seq_len, second_attention_mask=second_attention_mask)
     if model_type == 'big-head':
-        return BigHeadGPT2SequenceClassifier(model_size=model_size, max_seq_len=max_seq_len, activation=activation)
+        return BigHeadGPT2SequenceClassifier(model_size=model_size, max_seq_len=max_seq_len, activation=activation, head_hidden_size=hidden_size, dropout=dropout, second_attention_mask=second_attention_mask)
     elif model_type == 'probability':
         return GPTProbabilityClassifier(model_size=model_size, **get_probability_model_config(dataset_name), device=device)
     elif model_type == 'sae-classifier-gpt':
-        return SAEClassifier(device=device, max_seq_len=max_seq_len, freeze_sae=freeze, **get_sae_model_config(model_type))
+        return SAEClassifier(device=device, max_seq_len=max_seq_len, freeze_sae=freeze, second_attention_mask=second_attention_mask, **get_sae_model_config(model_type))
     elif model_type == 'sae-classifier-mistral7b':
-        return SAEClassifier(device=device, max_seq_len=max_seq_len, freeze_sae=freeze, **get_sae_model_config(model_type))
+        return SAEClassifier(device=device, max_seq_len=max_seq_len, freeze_sae=freeze, second_attention_mask=second_attention_mask, **get_sae_model_config(model_type))
     elif model_type == 'random':
         return RandomClassifier(device)
     elif model_type == 'gpt2-classifier': 

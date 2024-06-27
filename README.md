@@ -1,9 +1,8 @@
 # LLM Sparse Autoencoder Embeddings can be used to train NLP classifiers
 
-Below is some data which seems to show a small classifier trained on a sparse auto-encoding derived from GPT2-small (à la [golden gate claude](https://www.anthropic.com/news/golden-gate-claude)) out-performing various other straightforward methods for getting GPT2 to act as a classifier.
+Below is some data which seems to show a small classifier trained on a sparse auto-encoding derived from GPT2-small (à la [golden gate claude](https://www.anthropic.com/news/golden-gate-claude)) out-performing various other straightforward methods for getting GPT2 to act as a classifier on the [IMDB Sentiment dataset](https://paperswithcode.com/sota/sentiment-analysis-on-imdb).
 
-
-The upshot is that training autoencoders (sparse or otherwise) on LLMs may be a good way to get them to actually perform well on classification tasks. 
+The upshot is that training autoencoders (sparse or otherwise) on LLMs may be a good way to get them to perform well on classification tasks. 
 
 ## Wait, aren't LLMs good classifiers already?
 
@@ -17,19 +16,17 @@ This sucks because in practice most real-world NLP tasks that people and compani
 
 ## So Sparse Autoencoders are the solution?
 
-They might be in the right direction. This is what a sparse autoencoder looks like:
+They might be? This is what a sparse autoencoder looks like:
 
 ![](./notes/images/sae.png)
 
-Essentially you train it by having it observe the intermediate activations that flow through a LLM as the LLM processes different sequences. Eventually the autoencover starts to be able to pull out human-interpratable "features" which actvate only in response to certain words or phrases being processed by the host LLM, like "words relating to mechanical devices", or "landmarks" or even "the golden gate bridge". It's highly fascinating. A really good high level explanation by the some of the pioneers is [here](https://www.anthropic.com/news/golden-gate-claude), technical details can be found [here](https://transformer-circuits.pub/2024/scaling-monosemanticity/index.html) and there are even some nice explainer youtube videos like [this](https://www.youtube.com/watch?v=Mhp8vpOksWw).
+You train it by having it observe the intermediate activations that flow through a LLM as the LLM processes different sequences. Eventually the autoencover starts to be able to pull out human-interpratable "features" which actvate only in response to certain words or phrases being processed by the host LLM, features like "words relating to mechanical devices", or "landmarks" or "the golden gate bridge". It's highly fascinating. A really good high level explanation by the some of the pioneers is [here](https://www.anthropic.com/news/golden-gate-claude), technical details can be found [here](https://transformer-circuits.pub/2024/scaling-monosemanticity/index.html) and there are even some nice explainer youtube videos like [this](https://www.youtube.com/watch?v=Mhp8vpOksWw).
 
-Ok, so now we know roughly what a sparse autoencoder is, the really dumb and obvious idea is to just take those interpratable features, plonk them into any damn classifier you please (xgboost, logistic regression, `torch.nn.Linear`, whatever) and train that classifier to perform some classification task in the usual way. 
+Ok, so now we know roughly what a sparse autoencoder is, the really dumb and obvious idea is to just take those interpratable features, plonk them into classifier (xgboost, logistic regression, `torch.nn.Linear`, whatever) and train that classifier to perform some classification task in the usual way. 
 
 ![](./notes/images/sae-classifier.png)
 
-That's what I just spent the last week doing, you can see the full results on this Weights and Biases page <------------ but long story short: I used different techniques to turn GPT2 models of varios sizes into classifiers and tested them on 4 different binary classification benchmarks. The techniques which worked by far the best are the ones which use the sparse autoencoder embeddings.
-
-In particular, classification heads trained on the raw hidden states of the host LLM perform far worse than similar heads trained on the sparse autoencoder features.
+This is essentially what I did, you can see the full results on this Weights and Biases page <------------ but long story short: I used different techniques to turn GPT2 models into classifiers and tested them on the IMBD sentiment analyssi benchmark. The technique which worked by far the best was sparse autoencoder features (in particular, the features from the `gpt2-small-res-jb.blocks.8.hook_resid_pre` autoencoder [sae_lens](https://github.com/jbloomAus/SAELens))
 
 ## Ok, so what?
 
@@ -41,11 +38,15 @@ Of course the irony here is that people are training Sparse Autoencoders becasue
 
 We could probably get much better classification results by training a regular, non-sparse autoencoder in a similar way. If anyone wants to work on that please get in touch.
 
-## Final Thoughts
+## Ablation
 
-The use of sparse autoencoders at scale to understand the inner workings of LLMs is being considered a breakthrough of sorts in AI interpretability research. It probably is. We can now associate a single word in context with a large vector of interpratable features in a way that aligns with our intuitions. We can use this information to identify and control things like dishonesty, hate etc in the content that LLMs parse and produce.
+Some other things I tried which did not work:
 
-But we can probbaly use this information for a lot of other things too. In the long run [Towards Montoincity](https://transformer-circuits.pub/2024/scaling-monosemanticity/index.html) might actually go down in history as a breakthrough in *linguistics*.
+- You might expect this SAE feature classifiction strategy to perform well on few-shot tasks. To that end I created labeled versions of 3 of the datasets from the [RAFT benchmark](https://raft.elicit.org/) and tested the sae-classification strategy on these. The results were around what the RAFT authors achieved with an Adaboost classifier (with no LLM involvement), and n
+
+ Performing classifiaction on few-shot benchmarks with gpt2 and the sparse autoncoder method.
+- You might expect autoencoder features extracted from larger LLMs to better represent the underlying text, and therefore lead to better classifications. I tested this briefly by extracting sparse autoencoder features from mistral-7b using the `mistral-7b-res-wg.blocks.8.hook_resid_pre` autoencoder from [sae_lens](https://github.com/jbloomAus/SAELens). I found that this did not improve classification performance over the `gpt2-small-res-jb.blocks.8.hook_resid_pre` autoencoder.
+- 
 
 # Installation
 

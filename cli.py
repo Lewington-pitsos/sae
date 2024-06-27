@@ -50,7 +50,7 @@ def handle_runpod(args):
     print("\n°˖✧◝(⁰▿⁰)◜✧˖°\n")
 
 def handle_build_params(args):
-    build()
+    build(args.output)
 
     print("\n/ᐠ-ꞈ-ᐟ\ \nnyan\n")
 
@@ -79,7 +79,9 @@ def main():
 
     # build paramaters tool
     parser_build_params = subparsers.add_parser('params', help='Build parameters which defined the different training runs you want to run.')
+    parser_build_params.add_argument('--output', type=str, help='Output file path', default='.params.json')
     parser_build_params.set_defaults(func=handle_build_params)
+
 
     args = parser.parse_args()
     args.func(args)

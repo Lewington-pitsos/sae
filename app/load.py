@@ -5,7 +5,6 @@ from datasets import load_dataset, load_from_disk
 
 from app.constants import *
 from app.tok import load_tokenizer
-from app.models import SAEFeaturesModel, get_sae_model_config, masked_avg
 
 class IMDBDataset(Dataset):
     def __init__(self, tokenized_dataset):

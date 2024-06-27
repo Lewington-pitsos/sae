@@ -22,7 +22,7 @@ def log_model_parameters_info(model: nn.Module, skip_wandb: bool = False):
         wandb.log({"total_parameters": total_params, "trainable_parameters": trainable_params, "non_trainable_parameters": non_trainable_params, "trainable_parameter_ratio": ratio})
 
 class MetricsLogger():
-    def __init__(self, model_type, skip_wandb=False):
+    def __init__(self, model_type, skip_wandb=False, name=None):
         if not skip_wandb:
             self.batch1_table = wandb.Table(columns=["epoch", "idx", "input_text", "label", "prediction", "logits"])
         else:
@@ -38,10 +38,11 @@ class MetricsLogger():
         self.epoch = 0
         self.skip_wandb = skip_wandb
         self.start = time.time()
+        self.name = name
 
     def init(self, *args, **kwargs):
         if not self.skip_wandb:
-            wandb.init(reinit=True, *args, **kwargs)
+            wandb.init(reinit=True, name=self.name, *args, **kwargs)
 
     def step_epoch(self):
         avg_train_loss = sum(self.train_losses) / len(self.train_losses)
@@ -52,17 +53,18 @@ class MetricsLogger():
         self.train_f1 = []
         print(f"Epoch {self.epoch + 1}, Train Loss: {avg_train_loss}, Train Acc: {avg_train_accuracy}, Train F1 {avg_train_f1}")
 
-        avg_test_loss = sum(self.test_losses) / len(self.test_losses)
-        avg_test_accuracy = sum(self.test_acc) / len(self.test_acc)
-        avg_test_f1 = sum(self.test_f1) / len(self.test_f1)
-        self.test_losses = []
-        self.test_acc = []
-        self.test_f1 = []
-        print(f"Epoch {self.epoch + 1}, Test Loss: {avg_test_loss}, Test Acc: {avg_test_accuracy}, Test F1: {avg_test_f1}")
+        if len(self.test_losses) > 0:
+            avg_test_loss = sum(self.test_losses) / len(self.test_losses)
+            avg_test_accuracy = sum(self.test_acc) / len(self.test_acc)
+            avg_test_f1 = sum(self.test_f1) / len(self.test_f1)
+            self.test_losses = []
+            self.test_acc = []
+            self.test_f1 = []
+            print(f"Epoch {self.epoch + 1}, Test Loss: {avg_test_loss}, Test Acc: {avg_test_accuracy}, Test F1: {avg_test_f1}")
 
-        if not self.skip_wandb:
-            wandb.log({"train_loss": avg_train_loss, "train_accuracy": avg_train_accuracy, "train_f1": avg_train_f1})
-            wandb.log({"test_loss": avg_test_loss, "test_accuracy": avg_test_accuracy, "test_f1": avg_test_f1})
+            if not self.skip_wandb:
+                wandb.log({"train_loss": avg_train_loss, "train_accuracy": avg_train_accuracy, "train_f1": avg_train_f1})
+                wandb.log({"test_loss": avg_test_loss, "test_accuracy": avg_test_accuracy, "test_f1": avg_test_f1})
 
         self.epoch += 1
 
