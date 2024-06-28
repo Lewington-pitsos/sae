@@ -1,5 +1,7 @@
 # LLM Sparse Autoencoder Embeddings can be used to train NLP classifiers
 
+Full write up is on [medium](https://medium.com/@lewingtonpitsos/llm-sparse-autoencoder-embeddings-can-be-used-to-train-nlp-classifiers-3889c32cef6d). I also copy-pasted the text [here](./notes/write-up.md) 
+
 # Installation
 
 ## Mac/Linux
