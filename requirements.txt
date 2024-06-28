@@ -142,7 +142,6 @@ regex==2024.5.15
 requests==2.32.3
 rich==13.7.1
 rpds-py==0.18.1
-runpod==1.6.2
 s3transfer==0.10.1
 sae-lens==3.4.1
 sae-vis==0.2.19
