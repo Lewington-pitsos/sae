@@ -1,5 +1,5 @@
 import argparse
-from app import S3Store, run_all, deploy_pod, destroy_all_pods, show_pods, build, LOCAL_DATA_PATH
+from app import S3Store, run_all, build, LOCAL_DATA_PATH
 
 def handle_store(args):
     print('\n(￣个￣)\nstoremaster at your service!\n')
@@ -34,21 +34,6 @@ def handle_train(args):
 
     print('\nʕノ•ᴥ•ʔノ\ntraining complete\n')
 
-def handle_runpod(args):
-
-    print("\n°˖✧◝(⁰▿⁰)◜✧˖°\nlets run those pods\n")
-
-
-    if args.action == 'deploy':
-        deploy_pod()
-    elif args.action == 'purge':
-        print('purging all pods...\n')
-        destroy_all_pods()
-    elif args.action == 'show':
-        show_pods()
-
-    print("\n°˖✧◝(⁰▿⁰)◜✧˖°\n")
-
 def handle_build_params(args):
     build(args.output)
 
@@ -71,11 +56,6 @@ def main():
     parser_train.add_argument('--params', type=str, help='Path to the parameters file', default='.params.json')
     parser_train.add_argument('--project', type=str, help='Wandb project name', default='')
     parser_train.set_defaults(func=handle_train)
-
-    # Runpod tool
-    parser_runpod = subparsers.add_parser('runpod', help='Deplot a Runpod instance for cheap training')
-    parser_runpod.add_argument('action', choices=['deploy', 'purge', 'show'], help='Action to perform')
-    parser_runpod.set_defaults(func=handle_runpod)
 
     # build paramaters tool
     parser_build_params = subparsers.add_parser('params', help='Build parameters which defined the different training runs you want to run.')
