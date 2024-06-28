@@ -186,8 +186,6 @@ class SAEBaseModel(nn.Module):
                  sae_release: str,
                  sae_id:str,
                  device, 
-                 max_seq_len:int = None, 
-                 num_classes: int = 2,
                  freeze_sae: bool = True
         ):
         super(SAEBaseModel, self).__init__()
@@ -200,9 +198,6 @@ class SAEBaseModel(nn.Module):
             for param in self.sae.parameters():
                 param.requires_grad = False
 
-        seq_len = int(max_seq_len / 8)
-
-        self.fc1 = nn.Linear(sae.cfg.d_sae * seq_len, num_classes, bias=False)
         self.device = device
 
         self.model = HookedTransformer.from_pretrained(transformer_name, device=device)
@@ -211,10 +206,6 @@ class SAEBaseModel(nn.Module):
 
         for param in self.model.parameters():
             param.requires_grad = False
-
-
-        self.dropout = nn.Dropout(0.3)
-        self.avg_pool = nn.AvgPool1d(kernel_size=8, stride=8)
 
 
 class SAEFeaturesModel(SAEBaseModel):
@@ -227,9 +218,18 @@ class SAEFeaturesModel(SAEBaseModel):
         return features, hidden_states, final_hidden_states
 
 class SAEClassifier(SAEBaseModel):
-    def __init__(self, second_attention_mask, *args, **kwargs):
+    def __init__(self, second_attention_mask, max_seq_len, num_classes, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.second_attention_mask = second_attention_mask
+
+        seq_len = int(max_seq_len / 8)
+
+        self.fc1 = nn.Linear(self.sae.cfg.d_sae * seq_len, num_classes, bias=False)
+
+        self.dropout = nn.Dropout(0.3)
+        self.avg_pool = nn.AvgPool1d(kernel_size=8, stride=8)
+
+
 
     def forward(self, input_ids, attention_mask):
         _, cache = self.model.run_with_cache(input_ids, attention_mask=attention_mask, prepend_bos=True, stop_at_layer=self.hook_layer + 1)
