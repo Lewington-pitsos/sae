@@ -40,6 +40,8 @@ By default all metrics will be logged to [Weights and Biases](https://wandb.ai).
 
 The `params` command is a utility option to make it easier to build large lists of parameter sets. It basically just executes the `app/build_params.py` script.
 
+To run the XGBoost code simply `python -m app.boost`. This will create SAE embeddings as well as store the hidden features (form the middle and the end of the model) for the IMDB dataset and then run XGBoost on all 3 sets of features.
+
 # Citations/References
 
 The Sparse Autoencoder code comes from [sae_lens](https://github.com/jbloomAus/SAELens)
