@@ -1,6 +1,7 @@
 import tqdm
 import torch
 from torch.utils.data import DataLoader
+from datasets import load_dataset
 
 from app.models import SAEFeaturesModel, get_sae_model_config, masked_avg
 from app.constants import *
@@ -23,8 +24,12 @@ def get_dataset_name(raft_dataset_name, embedding_name, split):
     return f'{LOCAL_DATA_PATH}/{embedding_name}-{raft_dataset_name}-{split}.pt'
 
 def embed_dataset(raft_dataset_name, model_name, tokenizer, embedder, max_seq_len=256):
-    dataset = ingest_raft(raft_dataset_name)
-    text_column = get_text_column(dataset)
+    # dataset = ingest_raft(raft_dataset_name)
+    # text_column = get_text_column(dataset)
+    text_column = 'text'
+    dataset = load_dataset(raft_dataset_name)
+    del dataset['unsupervised']
+
 
     def tokenize_function(examples):
         return tokenizer(examples[text_column], padding='max_length', truncation=True, max_length=max_seq_len)
@@ -60,7 +65,7 @@ def embed_dataset(raft_dataset_name, model_name, tokenizer, embedder, max_seq_le
                     for j, emb in enumerate(embedding):
                         dataset[split][i * 16 + j][model_name] = emb.numpy().tolist()
 
-                    embeddings_and_labels = torch.cat([embedding, batch['Label'].unsqueeze(-1)], dim=1)
+                    embeddings_and_labels = torch.cat([embedding, batch['label'].unsqueeze(-1)], dim=1)
 
                     all_avg_fts[embedding_name].append(embeddings_and_labels)
             
@@ -74,7 +79,7 @@ def embed_dataset(raft_dataset_name, model_name, tokenizer, embedder, max_seq_le
 
 if __name__ == '__main__':
     embed_datasets(
-        dataset_names=RAFT_DATASETS,
+        dataset_names=['imdb'],
         model_name='sae-classifier-gpt',
         max_seq_len=256
     )
